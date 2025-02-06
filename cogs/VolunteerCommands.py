@@ -277,7 +277,7 @@ class CheckInSelect(discord.ui.Select):
             # Form the shift request
             timestamp = datetime.now()
             requester = interaction.user.display_name
-            shift_type = response.split(',')[2].strip()
+            shift_type = response.split(',')[2].strip().replace('-',' ')
             shift_day = response.split(',')[0].strip()
             shift_time = response.split(',')[1].strip()
             

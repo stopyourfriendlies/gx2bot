@@ -223,7 +223,7 @@ def get_requester_row(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign 
         if len(sheet_values[row_index][2].lower()) < 1:
             break
 
-        if str(requester).lower() in sheet_values[row_index][2].lower():
+        if str(requester).lower() == str(sheet_values[row_index][2]).lower():
             logger.info(f"{requester} is on row {row_index}")
             return row_index
         
