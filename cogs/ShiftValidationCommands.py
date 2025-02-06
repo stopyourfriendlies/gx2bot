@@ -153,6 +153,7 @@ class ShiftValidationCommands(commands.Cog):
 
     @commands.Cog.listener("on_message")
     async def notify_rewards_from_webhook(self, msg):
+        # TODO: Change hardcoded webhook id
         if msg.webhook_id == 1337111947551703142:
             # parse the msg
             content = msg.content
