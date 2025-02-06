@@ -28,7 +28,7 @@ from functools import lru_cache  # Least Recently Used Cache so we don't have to
 ## Logging
 
 logger = logging.getLogger('Spreadsheet Utils')  # set up a log called 'TO'
-logger.setLevel(logging.INFO)  # set Logging Level (DEBUG, INFO, WARNING, ERROR, CRITICAL) to only show info level and up
+logger.setLevel(logging.DEBUG)  # set Logging Level (DEBUG, INFO, WARNING, ERROR, CRITICAL) to only show info level and up
 
 # output log to file
 handler = logging.FileHandler(filename='SpreadsheetUtils.log', encoding='utf-8', mode='w')
@@ -149,6 +149,8 @@ def set_value(spreadsheet=os.getenv('SHEET_PUZZLES'), sheet=0, row=1, column=2, 
 
 @lru_cache
 def get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="value"):
+    logger.info(f"get_cell_indexes fired with values={str(value)}, spreadsheet={spreadsheet}, and sheet={sheet}")
+    
     sheet_values = get_values(spreadsheet, sheet)
     return_dict = dict()
     return_dict['row'] = -1
@@ -156,8 +158,8 @@ def get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign U
     return_dict['row_index'] = -1
     return_dict['column_index'] = -1
 
-    logger.info(value)
-    logger.info(sheet_values[13][3])
+    # logger.info(value)
+    # logger.info(sheet_values[13][3])
     
 
     for row_index in range(len(sheet_values)):
@@ -216,15 +218,15 @@ def get_shift_type_row(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign
 def get_requester_row(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', requester='nqztv'):
     sheet_values = get_values(spreadsheet, sheet)
     
-    for row_index in range(15, len(sheet_values)):
+    for row_index in range(17, len(sheet_values)):
         logger.info(sheet_values[row_index][2])
         if len(sheet_values[row_index][2].lower()) < 1:
             break
 
-        if requester.lower() in sheet_values[row_index][2].lower():
+        if str(requester).lower() in sheet_values[row_index][2].lower():
             logger.info(f"{requester} is on row {row_index}")
             return row_index
         
-    set_value(spreadsheet, sheet, row_index + 1, 3, requester)
+    set_value(spreadsheet, sheet, row_index + 1, 3, str(requester))
     
     return row_index

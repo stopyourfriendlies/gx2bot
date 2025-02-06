@@ -48,16 +48,17 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 
-
 ## Google Sheets setup
 
 # set credentials to use on the google sheet
 gc = gspread.service_account(filename='credentials.json')
 
 
+
 ### FUNCTIONS
 
-    
+
+
 ## Queue stuff
 requests_queue = queue.Queue()
 
@@ -83,13 +84,20 @@ class ShiftRequest:
 
     def is_available(self):
         # try:
+
+            logger.info(f"is_available fired with self.shift_day={str(self.shift_day)}, self.shift_time={str(self.shift_time)}, and self.shift_type={str(self.shift_type)}")
+    
             day_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value=str(self.shift_day))
 
             day_column = day_cell['column_index']
             day_row = day_cell['row_index']
 
+            logger.info(f"day_column={str(day_column)}, day_row={str(day_row)}")
+    
             time_column = get_time_column(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up', day_row, day_column, self.shift_time)
 
+            logger.info(f"time_column={str(time_column)}")
+    
             shift_type_row = get_shift_type_row(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up', self.shift_type)
 
             get_values.cache_clear()
@@ -143,13 +151,6 @@ class ShiftRequest:
         set_value(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up', requester_row + 1, time_column + 1, "")
     
         # gx_shift_signups_values[requester_row][time_column] = self.shift_type
-    
-        
-
-
-
-
-        
 
 
 
@@ -179,6 +180,25 @@ class ShiftRequest:
 
 
 
+
+
+
+
+
+
+
+
+
+# To add a new Select Response, copy an existing one and change the following:
+#
+# 1. modify the name of the class so 'class CheckInSelect(discord.ui.Select):' becomes 'class WhateverSelect(discord.ui.Select):'
+# 2. make sure the anchor cell value refer what it is in the shift signup google sheet 'thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")'       '
+# 3. modify shift_type is changed in __init__. so 'shift_type = "Check-In"' becomes 'shift_type = "Whatever"'
+# 4. modify shift_type is changed in callback. so 'shift_type = "Check-In"' becomes 'shift_type = "Whatever"'
+# 5. modify the name of the SelectView class so 'class CheckInSelectView(discord.ui.View):' becomes 'class WhateverSelectView(discord.ui.View):'
+# 6. make sure the SelectView points to the Select class so 'self.add_item(CheckInSelect())' becomes 'self.add_item(WhateverSelect())'
+# 7. add a section to the on_message listener so that it will fire a bot response when a user types something specifically all the way at the bottom where you see '@commands.Cog.listener("on_message") async def sheet_responses(self, message):'
+   
 
 
 
@@ -189,60 +209,67 @@ class CheckInSelect(discord.ui.Select):
         get_values.cache_clear()
         latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
 
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Check-In"
+
         # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
         thursday_column = thursday_cell['column_index']
         thursday_row = thursday_cell['row_index']
 
+        logger.info(f"{shift_type.replace(' ', '').replace('-', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
         # Initialize some vars
         shift_day = "Thursday"
         options = []
 
         # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
                 
                 logger.debug(str(latest_data[row_index][column_index]))
                 
-                # Set day of week for shift
-                if (row_index == thursday_row):
-                    if str(latest_data[row_index][column_index]) != "":
-                        shift_day = str(latest_data[row_index][column_index])
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
+                if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
+                    shift_day = str(latest_data[row_index][column_index])
                     continue
 
-                # Sanity Check: skip if not the right shift type
-                if ("check-in" not in str(latest_data[row_index][column_index]).lower()):
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].split('-')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
                     continue
 
                 # Sanity Check: skip if their are 0 shifts left
                 if ("​0​/" in str(latest_data[row_index][column_index])):
                     continue
 
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
                 if (len(options) >= 25):
                     break
 
                 # If sanity checks pass, set the variables needed to add a select menu option
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Check In"
-
+                
                 # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the Check-In Select Menu")
-                options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="🚶",description=""))
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
+                options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
 
         # Set the Select Menu options
         if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no Check In shifts available right now."))
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
 
         # Set up the select menu
-        super().__init__(placeholder="Check-In Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
     
     async def callback(self, interaction: discord.Interaction):
+        # if no shifts, make no response
         if "sorry" in str(self.values[0]).lower():
             await interaction.response.defer()
         
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Check-In"
+
         # Send the user a message that you are processing their requests
-        await interaction.response.send_message(content="Your Check In shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
 
         # Go through each request if the user selected multiple options in the dropdown
         for response in self.values:
@@ -294,101 +321,6 @@ class CheckInSelectView(discord.ui.View):
 
 
 
-class MeleeSelect(discord.ui.Select):
-    def __init__(self):
-        # Clear cache and then pull the latest values from the sheet
-        get_values.cache_clear()
-        latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
-
-        # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
-        thursday_column = thursday_cell['column_index']
-        thursday_row = thursday_cell['row_index']
-
-        # Initialize some vars
-        shift_day = "Thursday"
-        options = []
-
-        # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
-            for row_index in range(thursday_row, -1, -1):
-                
-                logger.debug(str(latest_data[row_index][column_index]))
-                
-                # Set day of week for shift
-                if (row_index == thursday_row):
-                    if str(latest_data[row_index][column_index]) != "":
-                        shift_day = str(latest_data[row_index][column_index])
-                    continue
-
-                # Sanity Check: skip if not the right shift type
-                if ("melee" not in str(latest_data[row_index][column_index]).lower()):
-                    continue
-
-                # Sanity Check: skip if their are 0 shifts left
-                if ("​0​/" in str(latest_data[row_index][column_index])):
-                    continue
-
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
-                if (len(options) >= 25):
-                    break
-
-                # If sanity checks pass, set the variables needed to add a select menu option
-                shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Melee"
-
-                # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the Melee Select Menu")
-                options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="🚶",description=""))
-
-        # Set the Select Menu options
-        if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no Melee shifts available right now."))
-
-        # Set up the select menu
-        super().__init__(placeholder="Melee Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
-    
-    async def callback(self, interaction: discord.Interaction):
-        if "sorry" in str(self.values[0]).lower():
-            await interaction.response.defer()
-        
-        # Send the user a message that you are processing their requests
-        await interaction.response.send_message(content="Your Melee shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
-
-        # Go through each request if the user selected multiple options in the dropdown
-        for response in self.values:
-            
-            # Form the shift request
-            timestamp = datetime.now()
-            requester = interaction.user.display_name
-            shift_type = response.split(',')[2].strip()
-            shift_day = response.split(',')[0].strip()
-            shift_time = response.split(',')[1].strip()
-            
-            request = ShiftRequest(timestamp, requester, shift_type, shift_day, shift_time, interaction)
-
-            logging.info(f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}")
-            
-            # Add the shift request to the queue
-            requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
-
-class MeleeSelectView(discord.ui.View):
-    def __init__(self, *, timeout = 600):
-        super().__init__(timeout=timeout)
-        self.add_item(MeleeSelect())
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -410,58 +342,67 @@ class UltimateSelect(discord.ui.Select):
         get_values.cache_clear()
         latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
 
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Ultimate"
+
         # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
         thursday_column = thursday_cell['column_index']
         thursday_row = thursday_cell['row_index']
 
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
         # Initialize some vars
         shift_day = "Thursday"
         options = []
 
         # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
                 
                 logger.debug(str(latest_data[row_index][column_index]))
                 
-                # Set day of week for shift
-                if (row_index == thursday_row):
-                    if str(latest_data[row_index][column_index]) != "":
-                        shift_day = str(latest_data[row_index][column_index])
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
+                if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
+                    shift_day = str(latest_data[row_index][column_index])
                     continue
 
-                # Sanity Check: skip if not the right shift type
-                if ("ultimate" not in str(latest_data[row_index][column_index]).lower()):
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
                     continue
 
                 # Sanity Check: skip if their are 0 shifts left
                 if ("​0​/" in str(latest_data[row_index][column_index])):
                     continue
 
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
                 if (len(options) >= 25):
                     break
 
                 # If sanity checks pass, set the variables needed to add a select menu option
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Ultimate"
-
+                
                 # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the Ultimate Select Menu")
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
                 options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
 
         # Set the Select Menu options
         if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no Ultimate shifts available right now."))
-        super().__init__(placeholder="Ultimate Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
+
+        # Set up the select menu
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
     
     async def callback(self, interaction: discord.Interaction):
-        if "Sorry".lower() in str(self.values[0]).lower():
+        # if no shifts, make no response
+        if "sorry" in str(self.values[0]).lower():
             await interaction.response.defer()
-        # Send the user a message that you are processing their requests
         
-        await interaction.response.send_message(content="Your Ultimate shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Ultimate"
+
+        # Send the user a message that you are processing their requests
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
 
         # Go through each request if the user selected multiple options in the dropdown
         for response in self.values:
@@ -520,64 +461,81 @@ class UltimateSelectView(discord.ui.View):
 
 
 
-class FloaterSelect(discord.ui.Select):
+
+
+
+
+
+
+
+
+class MeleeSelect(discord.ui.Select):
     def __init__(self):
         # Clear cache and then pull the latest values from the sheet
         get_values.cache_clear()
         latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
 
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Melee"
+
         # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
         thursday_column = thursday_cell['column_index']
         thursday_row = thursday_cell['row_index']
 
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
         # Initialize some vars
         shift_day = "Thursday"
         options = []
 
         # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
                 
                 logger.debug(str(latest_data[row_index][column_index]))
                 
-                # Set day of week for shift
-                if (row_index == thursday_row):
-                    if str(latest_data[row_index][column_index]) != "":
-                        shift_day = str(latest_data[row_index][column_index])
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
+                if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
+                    shift_day = str(latest_data[row_index][column_index])
                     continue
 
-                # Sanity Check: skip if not the right shift type
-                if ("FLOATER".lower() not in str(latest_data[row_index][column_index]).lower()):
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
                     continue
 
                 # Sanity Check: skip if their are 0 shifts left
                 if ("​0​/" in str(latest_data[row_index][column_index])):
                     continue
 
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
                 if (len(options) >= 25):
                     break
 
                 # If sanity checks pass, set the variables needed to add a select menu option
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Floater"
-
+                
                 # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the Floater Select Menu")
-                options.append(discord.SelectOption(label=f"{shift_day}, {shift_time}, {shift_type.upper()}",emoji="🚶",description=""))
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
+                options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
 
         # Set the Select Menu options
         if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no Floater shifts available right now."))
-        super().__init__(placeholder="Floater Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
+
+        # Set up the select menu
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
     
     async def callback(self, interaction: discord.Interaction):
-        if "Sorry".lower() in str(self.values[0]).lower():
+        # if no shifts, make no response
+        if "sorry" in str(self.values[0]).lower():
             await interaction.response.defer()
-        # Send the user a message that you are processing their requests
         
-        await interaction.response.send_message(content="Your Floater shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Melee"
+
+        # Send the user a message that you are processing their requests
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
 
         # Go through each request if the user selected multiple options in the dropdown
         for response in self.values:
@@ -597,10 +555,415 @@ class FloaterSelect(discord.ui.Select):
             requests_queue.put(request)
             logging.info("Queue size: " + str(requests_queue.qsize()))
 
-class FloaterSelectView(discord.ui.View):
+class MeleeSelectView(discord.ui.View):
     def __init__(self, *, timeout = 600):
         super().__init__(timeout=timeout)
-        self.add_item(FloaterSelect())
+        self.add_item(MeleeSelect())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class RivalsSelect(discord.ui.Select):
+    def __init__(self):
+        # Clear cache and then pull the latest values from the sheet
+        get_values.cache_clear()
+        latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
+
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Rivals"
+
+        # Get the row and column of the Days of Week by finding where Thursday is
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
+        thursday_column = thursday_cell['column_index']
+        thursday_row = thursday_cell['row_index']
+
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
+        # Initialize some vars
+        shift_day = "Thursday"
+        options = []
+
+        # Go bottom-up, left-right to find shifts
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
+            for row_index in range(thursday_row, -1, -1):
+                
+                logger.debug(str(latest_data[row_index][column_index]))
+                
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
+                if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
+                    shift_day = str(latest_data[row_index][column_index])
+                    continue
+
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
+                    continue
+
+                # Sanity Check: skip if their are 0 shifts left
+                if ("​0​/" in str(latest_data[row_index][column_index])):
+                    continue
+
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
+                if (len(options) >= 25):
+                    break
+
+                # If sanity checks pass, set the variables needed to add a select menu option
+                shift_time = latest_data[int(thursday_row) + 1][column_index]
+                
+                # Add shift into the Select Menu dropdown
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
+                options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
+
+        # Set the Select Menu options
+        if len(options) < 1:
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
+
+        # Set up the select menu
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+    
+    async def callback(self, interaction: discord.Interaction):
+        # if no shifts, make no response
+        if "sorry" in str(self.values[0]).lower():
+            await interaction.response.defer()
+        
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Rivals"
+
+        # Send the user a message that you are processing their requests
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+
+        # Go through each request if the user selected multiple options in the dropdown
+        for response in self.values:
+            
+            # Form the shift request
+            timestamp = datetime.now()
+            requester = interaction.user.display_name
+            shift_type = response.split(',')[2].strip()
+            shift_day = response.split(',')[0].strip()
+            shift_time = response.split(',')[1].strip()
+            
+            request = ShiftRequest(timestamp, requester, shift_type, shift_day, shift_time, interaction)
+
+            logging.info(f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}")
+            
+            # Add the shift request to the queue
+            requests_queue.put(request)
+            logging.info("Queue size: " + str(requests_queue.qsize()))
+
+class RivalsSelectView(discord.ui.View):
+    def __init__(self, *, timeout = 600):
+        super().__init__(timeout=timeout)
+        self.add_item(RivalsSelect())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class StreetFighterSelect(discord.ui.Select):
+    def __init__(self):
+        # Clear cache and then pull the latest values from the sheet
+        get_values.cache_clear()
+        latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
+
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Street Fighter"
+
+        # Get the row and column of the Days of Week by finding where Thursday is
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
+        thursday_column = thursday_cell['column_index']
+        thursday_row = thursday_cell['row_index']
+
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
+        # Initialize some vars
+        shift_day = "Thursday"
+        options = []
+
+        # Go bottom-up, left-right to find shifts
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
+            for row_index in range(thursday_row, -1, -1):
+                
+                logger.debug(str(latest_data[row_index][column_index]))
+                
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
+                if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
+                    shift_day = str(latest_data[row_index][column_index])
+                    continue
+
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
+                    continue
+
+                # Sanity Check: skip if their are 0 shifts left
+                if ("​0​/" in str(latest_data[row_index][column_index])):
+                    continue
+
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
+                if (len(options) >= 25):
+                    break
+
+                # If sanity checks pass, set the variables needed to add a select menu option
+                shift_time = latest_data[int(thursday_row) + 1][column_index]
+                
+                # Add shift into the Select Menu dropdown
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
+                options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
+
+        # Set the Select Menu options
+        if len(options) < 1:
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
+
+        # Set up the select menu
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+    
+    async def callback(self, interaction: discord.Interaction):
+        # if no shifts, make no response
+        if "sorry" in str(self.values[0]).lower():
+            await interaction.response.defer()
+        
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Street Fighter"
+
+        # Send the user a message that you are processing their requests
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+
+        # Go through each request if the user selected multiple options in the dropdown
+        for response in self.values:
+            
+            # Form the shift request
+            timestamp = datetime.now()
+            requester = interaction.user.display_name
+            shift_type = response.split(',')[2].strip()
+            shift_day = response.split(',')[0].strip()
+            shift_time = response.split(',')[1].strip()
+            
+            request = ShiftRequest(timestamp, requester, shift_type, shift_day, shift_time, interaction)
+
+            logging.info(f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}")
+            
+            # Add the shift request to the queue
+            requests_queue.put(request)
+            logging.info("Queue size: " + str(requests_queue.qsize()))
+
+class StreetFighterSelectView(discord.ui.View):
+    def __init__(self, *, timeout = 600):
+        super().__init__(timeout=timeout)
+        self.add_item(StreetFighterSelect())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class TekkenSelect(discord.ui.Select):
+    def __init__(self):
+        # Clear cache and then pull the latest values from the sheet
+        get_values.cache_clear()
+        latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
+
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Tekken"
+
+        # Get the row and column of the Days of Week by finding where Thursday is
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
+        thursday_column = thursday_cell['column_index']
+        thursday_row = thursday_cell['row_index']
+
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
+        # Initialize some vars
+        shift_day = "Thursday"
+        options = []
+
+        # Go bottom-up, left-right to find shifts
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
+            for row_index in range(thursday_row, -1, -1):
+                
+                logger.debug(str(latest_data[row_index][column_index]))
+                
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
+                if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
+                    shift_day = str(latest_data[row_index][column_index])
+                    continue
+
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
+                    continue
+
+                # Sanity Check: skip if their are 0 shifts left
+                if ("​0​/" in str(latest_data[row_index][column_index])):
+                    continue
+
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
+                if (len(options) >= 25):
+                    break
+
+                # If sanity checks pass, set the variables needed to add a select menu option
+                shift_time = latest_data[int(thursday_row) + 1][column_index]
+                
+                # Add shift into the Select Menu dropdown
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
+                options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
+
+        # Set the Select Menu options
+        if len(options) < 1:
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
+
+        # Set up the select menu
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+    
+    async def callback(self, interaction: discord.Interaction):
+        # if no shifts, make no response
+        if "sorry" in str(self.values[0]).lower():
+            await interaction.response.defer()
+        
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Tekken"
+
+        # Send the user a message that you are processing their requests
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+
+        # Go through each request if the user selected multiple options in the dropdown
+        for response in self.values:
+            
+            # Form the shift request
+            timestamp = datetime.now()
+            requester = interaction.user.display_name
+            shift_type = response.split(',')[2].strip()
+            shift_day = response.split(',')[0].strip()
+            shift_time = response.split(',')[1].strip()
+            
+            request = ShiftRequest(timestamp, requester, shift_type, shift_day, shift_time, interaction)
+
+            logging.info(f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}")
+            
+            # Add the shift request to the queue
+            requests_queue.put(request)
+            logging.info("Queue size: " + str(requests_queue.qsize()))
+
+class TekkenSelectView(discord.ui.View):
+    def __init__(self, *, timeout = 600):
+        super().__init__(timeout=timeout)
+        self.add_item(TekkenSelect())
+
+
+
+
+
+
+
 
 
 
@@ -642,60 +1005,67 @@ class GuiltyGearSelect(discord.ui.Select):
         get_values.cache_clear()
         latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
 
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Guilty Gear"
+
         # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
         thursday_column = thursday_cell['column_index']
         thursday_row = thursday_cell['row_index']
 
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
         # Initialize some vars
         shift_day = "Thursday"
         options = []
 
         # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
                 
                 logger.debug(str(latest_data[row_index][column_index]))
                 
-                # Set day of week for shift if cell is not blank
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
                     shift_day = str(latest_data[row_index][column_index])
                     continue
 
-                # Sanity Check: skip if not the right shift type
-                if ("guilty gear" not in str(latest_data[row_index][column_index]).lower()):
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
                     continue
 
                 # Sanity Check: skip if their are 0 shifts left
                 if ("​0​/" in str(latest_data[row_index][column_index])):
                     continue
 
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
                 if (len(options) >= 25):
                     break
 
                 # If sanity checks pass, set the variables needed to add a select menu option
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Guilty Gear"
-
+                
                 # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the Guilty Gear Select Menu")
-                options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper().title()}",emoji="📋",description=""))
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
+                options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
 
         # Set the Select Menu options
         if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no Guilty Gear shifts available right now."))
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
 
         # Set up the select menu
-        super().__init__(placeholder="Guilty Gear Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
     
     async def callback(self, interaction: discord.Interaction):
         # if no shifts, make no response
         if "sorry" in str(self.values[0]).lower():
             await interaction.response.defer()
+        
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "GuiltyGear"
 
         # Send the user a message that you are processing their requests
-        await interaction.response.send_message(content="Your Guilty Gear shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
 
         # Go through each request if the user selected multiple options in the dropdown
         for response in self.values:
@@ -747,66 +1117,87 @@ class GuiltyGearSelectView(discord.ui.View):
 
 
 
-class SF6Select(discord.ui.Select):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class DegenesisSelect(discord.ui.Select):
     def __init__(self):
         # Clear cache and then pull the latest values from the sheet
         get_values.cache_clear()
         latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
 
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Degenesis"
+
         # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
         thursday_column = thursday_cell['column_index']
         thursday_row = thursday_cell['row_index']
 
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
         # Initialize some vars
         shift_day = "Thursday"
         options = []
 
         # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
                 
                 logger.debug(str(latest_data[row_index][column_index]))
                 
-                # Set day of week for shift if cell is not blank
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
                     shift_day = str(latest_data[row_index][column_index])
                     continue
 
-                # Sanity Check: skip if not the right shift type
-                if ("sf6" not in str(latest_data[row_index][column_index]).lower()):
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
                     continue
 
                 # Sanity Check: skip if their are 0 shifts left
                 if ("​0​/" in str(latest_data[row_index][column_index])):
                     continue
 
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
                 if (len(options) >= 25):
                     break
 
                 # If sanity checks pass, set the variables needed to add a select menu option
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Sf6"
-
+                
                 # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the SF6 Select Menu")
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
                 options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
 
         # Set the Select Menu options
         if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no SF6 shifts available right now."))
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
 
         # Set up the select menu
-        super().__init__(placeholder="SF6 Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
     
     async def callback(self, interaction: discord.Interaction):
         # if no shifts, make no response
         if "sorry" in str(self.values[0]).lower():
             await interaction.response.defer()
+        
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Degenesis"
 
         # Send the user a message that you are processing their requests
-        await interaction.response.send_message(content="Your SF6 shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
 
         # Go through each request if the user selected multiple options in the dropdown
         for response in self.values:
@@ -826,10 +1217,10 @@ class SF6Select(discord.ui.Select):
             requests_queue.put(request)
             logging.info("Queue size: " + str(requests_queue.qsize()))
 
-class SF6SelectView(discord.ui.View):
+class DegenesisSelectView(discord.ui.View):
     def __init__(self, *, timeout = 600):
         super().__init__(timeout=timeout)
-        self.add_item(SF6Select())
+        self.add_item(DegenesisSelect())
 
 
 
@@ -855,66 +1246,91 @@ class SF6SelectView(discord.ui.View):
 
 
 
-class TekkenSelect(discord.ui.Select):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class DataEntrySelect(discord.ui.Select):
     def __init__(self):
         # Clear cache and then pull the latest values from the sheet
         get_values.cache_clear()
         latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
 
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Data Entry"
+
         # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
         thursday_column = thursday_cell['column_index']
         thursday_row = thursday_cell['row_index']
 
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
         # Initialize some vars
         shift_day = "Thursday"
         options = []
 
         # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
                 
                 logger.debug(str(latest_data[row_index][column_index]))
                 
-                # Set day of week for shift if cell is not blank
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
                     shift_day = str(latest_data[row_index][column_index])
                     continue
 
-                # Sanity Check: skip if not the right shift type
-                if ("tekken" not in str(latest_data[row_index][column_index]).lower()):
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
                     continue
 
                 # Sanity Check: skip if their are 0 shifts left
                 if ("​0​/" in str(latest_data[row_index][column_index])):
                     continue
 
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
                 if (len(options) >= 25):
                     break
 
                 # If sanity checks pass, set the variables needed to add a select menu option
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Tekken"
-
+                
                 # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the Tekken Select Menu")
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
                 options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
 
         # Set the Select Menu options
         if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no Tekken shifts available right now."))
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
 
         # Set up the select menu
-        super().__init__(placeholder="Tekken Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
     
     async def callback(self, interaction: discord.Interaction):
         # if no shifts, make no response
         if "sorry" in str(self.values[0]).lower():
             await interaction.response.defer()
+        
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Data Entry"
 
         # Send the user a message that you are processing their requests
-        await interaction.response.send_message(content="Your Tekken shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
 
         # Go through each request if the user selected multiple options in the dropdown
         for response in self.values:
@@ -934,10 +1350,10 @@ class TekkenSelect(discord.ui.Select):
             requests_queue.put(request)
             logging.info("Queue size: " + str(requests_queue.qsize()))
 
-class TekkenSelectView(discord.ui.View):
+class DataEntrySelectView(discord.ui.View):
     def __init__(self, *, timeout = 600):
         super().__init__(timeout=timeout)
-        self.add_item(TekkenSelect())
+        self.add_item(DataEntrySelect())
 
 
 
@@ -953,99 +1369,6 @@ class TekkenSelectView(discord.ui.View):
 
 
 
-
-
-
-
-
-
-
-
-
-
-class RushdownSelect(discord.ui.Select):
-    def __init__(self):
-        # Clear cache and then pull the latest values from the sheet
-        get_values.cache_clear()
-        latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
-
-        # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
-        thursday_column = thursday_cell['column_index']
-        thursday_row = thursday_cell['row_index']
-
-        # Initialize some vars
-        shift_day = "Thursday"
-        options = []
-
-        # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
-            for row_index in range(thursday_row, -1, -1):
-                
-                logger.debug(str(latest_data[row_index][column_index]))
-                
-                # Set day of week for shift if cell is not blank
-                if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
-                    shift_day = str(latest_data[row_index][column_index])
-                    continue
-
-                # Sanity Check: skip if not the right shift type
-                if ("rushdown" not in str(latest_data[row_index][column_index]).lower()):
-                    continue
-
-                # Sanity Check: skip if their are 0 shifts left
-                if ("​0​/" in str(latest_data[row_index][column_index])):
-                    continue
-
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
-                if (len(options) >= 25):
-                    break
-
-                # If sanity checks pass, set the variables needed to add a select menu option
-                shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Rushdown"
-
-                # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the Rushdown Select Menu")
-                options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
-
-        # Set the Select Menu options
-        if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no Rushdown shifts available right now."))
-
-        # Set up the select menu
-        super().__init__(placeholder="Rushdown Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
-    
-    async def callback(self, interaction: discord.Interaction):
-        # if no shifts, make no response
-        if "sorry" in str(self.values[0]).lower():
-            await interaction.response.defer()
-
-        # Send the user a message that you are processing their requests
-        await interaction.response.send_message(content="Your Rushdown shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
-
-        # Go through each request if the user selected multiple options in the dropdown
-        for response in self.values:
-            
-            # Form the shift request
-            timestamp = datetime.now()
-            requester = interaction.user.display_name
-            shift_type = response.split(',')[2].strip()
-            shift_day = response.split(',')[0].strip()
-            shift_time = response.split(',')[1].strip()
-            
-            request = ShiftRequest(timestamp, requester, shift_type, shift_day, shift_time, interaction)
-
-            logging.info(f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}")
-            
-            # Add the shift request to the queue
-            requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
-
-class RushdownSelectView(discord.ui.View):
-    def __init__(self, *, timeout = 600):
-        super().__init__(timeout=timeout)
-        self.add_item(RushdownSelect())
 
 
 
@@ -1080,60 +1403,67 @@ class BracketsOnDemandSelect(discord.ui.Select):
         get_values.cache_clear()
         latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
 
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Brackets On Demand"
+
         # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
         thursday_column = thursday_cell['column_index']
         thursday_row = thursday_cell['row_index']
 
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
         # Initialize some vars
         shift_day = "Thursday"
         options = []
 
         # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
                 
                 logger.debug(str(latest_data[row_index][column_index]))
                 
-                # Set day of week for shift if cell is not blank
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
                     shift_day = str(latest_data[row_index][column_index])
                     continue
 
-                # Sanity Check: skip if not the right shift type
-                if ("brackets" not in str(latest_data[row_index][column_index]).lower()):
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
                     continue
 
                 # Sanity Check: skip if their are 0 shifts left
                 if ("​0​/" in str(latest_data[row_index][column_index])):
                     continue
 
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
                 if (len(options) >= 25):
                     break
 
                 # If sanity checks pass, set the variables needed to add a select menu option
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Brackets On Demand"
-
+                
                 # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the Brackets On Demand Select Menu")
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
                 options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
 
         # Set the Select Menu options
         if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no Brackets On Demand shifts available right now."))
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
 
         # Set up the select menu
-        super().__init__(placeholder="Brackets On Demand Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
     
     async def callback(self, interaction: discord.Interaction):
         # if no shifts, make no response
         if "sorry" in str(self.values[0]).lower():
             await interaction.response.defer()
+        
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Brackets On Demand"
 
         # Send the user a message that you are processing their requests
-        await interaction.response.send_message(content="Your Brackets On Demand shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
 
         # Go through each request if the user selected multiple options in the dropdown
         for response in self.values:
@@ -1183,66 +1513,90 @@ class BracketsOnDemandSelectView(discord.ui.View):
 
 
 
-class DataEntrySelect(discord.ui.Select):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class InfoDeskSelect(discord.ui.Select):
     def __init__(self):
         # Clear cache and then pull the latest values from the sheet
         get_values.cache_clear()
         latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
 
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Info Desk"
+
         # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
         thursday_column = thursday_cell['column_index']
         thursday_row = thursday_cell['row_index']
 
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
         # Initialize some vars
         shift_day = "Thursday"
         options = []
 
         # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
                 
                 logger.debug(str(latest_data[row_index][column_index]))
                 
-                # Set day of week for shift if cell is not blank
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
                     shift_day = str(latest_data[row_index][column_index])
                     continue
 
-                # Sanity Check: skip if not the right shift type
-                if ("data entry" not in str(latest_data[row_index][column_index]).lower()):
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
                     continue
 
                 # Sanity Check: skip if their are 0 shifts left
                 if ("​0​/" in str(latest_data[row_index][column_index])):
                     continue
 
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
                 if (len(options) >= 25):
                     break
 
                 # If sanity checks pass, set the variables needed to add a select menu option
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Data Entry"
-
+                
                 # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the Data Entry Select Menu")
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
                 options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
 
         # Set the Select Menu options
         if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no Data Entry shifts available right now."))
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
 
         # Set up the select menu
-        super().__init__(placeholder="Data Entry Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
     
     async def callback(self, interaction: discord.Interaction):
         # if no shifts, make no response
         if "sorry" in str(self.values[0]).lower():
             await interaction.response.defer()
+        
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Info Desk"
 
         # Send the user a message that you are processing their requests
-        await interaction.response.send_message(content="Your Data Entry shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
 
         # Go through each request if the user selected multiple options in the dropdown
         for response in self.values:
@@ -1262,10 +1616,10 @@ class DataEntrySelect(discord.ui.Select):
             requests_queue.put(request)
             logging.info("Queue size: " + str(requests_queue.qsize()))
 
-class DataEntrySelectView(discord.ui.View):
+class InfoDeskSelectView(discord.ui.View):
     def __init__(self, *, timeout = 600):
         super().__init__(timeout=timeout)
-        self.add_item(DataEntrySelect())
+        self.add_item(InfoDeskSelect())
 
 
 
@@ -1291,66 +1645,91 @@ class DataEntrySelectView(discord.ui.View):
 
 
 
-class MerchSelect(discord.ui.Select):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class FloaterSelect(discord.ui.Select):
     def __init__(self):
         # Clear cache and then pull the latest values from the sheet
         get_values.cache_clear()
         latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
 
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Floater"
+
         # Get the row and column of the Days of Week by finding where Thursday is
-        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
+        thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
         thursday_column = thursday_cell['column_index']
         thursday_row = thursday_cell['row_index']
 
+        logger.info(f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}")
+    
         # Initialize some vars
         shift_day = "Thursday"
         options = []
 
         # Go bottom-up, left-right to find shifts
-        for column_index in range(thursday_column, len(latest_data[0]), 2):
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
                 
                 logger.debug(str(latest_data[row_index][column_index]))
                 
-                # Set day of week for shift if cell is not blank
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(latest_data[row_index][column_index]) != "":
                     shift_day = str(latest_data[row_index][column_index])
                     continue
 
-                # Sanity Check: skip if not the right shift type
-                if ("merch" not in str(latest_data[row_index][column_index]).lower()):
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (f"{shift_type.split(' ')[0].strip().lower()}" not in str(latest_data[row_index][column_index]).lower()):
                     continue
 
                 # Sanity Check: skip if their are 0 shifts left
                 if ("​0​/" in str(latest_data[row_index][column_index])):
                     continue
 
-                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
                 if (len(options) >= 25):
                     break
 
                 # If sanity checks pass, set the variables needed to add a select menu option
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
-                shift_type = "Merch"
-
+                
                 # Add shift into the Select Menu dropdown
-                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the Merch Select Menu")
+                logger.info(f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu")
                 options.append(discord.SelectOption(label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",emoji="📋",description=""))
 
         # Set the Select Menu options
         if len(options) < 1:
-            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description="There are no Merch shifts available right now."))
+            options.append(discord.SelectOption(label=f"Sorry",emoji="❌",description=f"There are no {shift_type} shifts available right now."))
 
         # Set up the select menu
-        super().__init__(placeholder="Merch Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
+        super().__init__(placeholder=f"{shift_type} Shifts (Select Multiple)", max_values=len(options), min_values=0, options = options)
     
     async def callback(self, interaction: discord.Interaction):
         # if no shifts, make no response
         if "sorry" in str(self.values[0]).lower():
             await interaction.response.defer()
+        
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "Floater"
 
         # Send the user a message that you are processing their requests
-        await interaction.response.send_message(content="Your Merch shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
+        await interaction.response.send_message(content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!", ephemeral=True)
 
         # Go through each request if the user selected multiple options in the dropdown
         for response in self.values:
@@ -1370,77 +1749,10 @@ class MerchSelect(discord.ui.Select):
             requests_queue.put(request)
             logging.info("Queue size: " + str(requests_queue.qsize()))
 
-class MerchSelectView(discord.ui.View):
+class FloaterSelectView(discord.ui.View):
     def __init__(self, *, timeout = 600):
         super().__init__(timeout=timeout)
-        self.add_item(MerchSelect())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        self.add_item(FloaterSelect())
 
 
 
@@ -1542,6 +1854,42 @@ class UnscheduleShiftButton(Button):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class UserShiftButtons(discord.ui.View):
     def __init__(self, *, timeout=600, username="", shifts=[]):
         self.username = username
@@ -1550,10 +1898,48 @@ class UserShiftButtons(discord.ui.View):
 
         for shift in self.shifts:
             self.add_item(UnscheduleShiftButton(label=f"{shift.shift_day.title()}, {shift.shift_time}: {shift.shift_type.upper()}", style=discord.ButtonStyle.blurple, shift=shift))
-            
 
 
-    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1628,105 +2014,94 @@ class VolunteerCommands(commands.Cog):
         # Respond to request to help with Check-In
         if message.content.lower() == "i would like to help with checkin":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**CHECK-IN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Check-In** team.\n\nThe Check-In team leads are **<@214515494554697738>** and **<@237313363556696065>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=CheckInSelectView())
+            await message.author.send(f"**CHECK-IN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Check-In** team.\n\nThe Check-In team leads are **<@237313363556696065>** and **<@280949423612100608>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=CheckInSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
-
-        if message.content.lower() == "i would like to help with melee":
-            # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**MELEE SHIFT SIGNUPS**\n\nThanks for offering to help with the **Melee** team.\n\nThe Melee team leads are **<@327166415713075212>** and **<@150905096413118465>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=MeleeSelectView())
-            
-            # Acknowledge the user's message with an emote react.
-            await message.add_reaction("✅")
-        
-
         if message.content.lower() == "i would like to help with ultimate":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**ULTIMATE SHIFT SIGNUPS**\n\nThanks for offering to help with the **Ultimate** team.\n\nThe Ultimate team leads are **<@179308376650416128>**, **<@97043736063668224>**, and **<@231911162902478849>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=UltimateSelectView())
+            await message.author.send(f"**ULTIMATE SHIFT SIGNUPS**\n\nThanks for offering to help with the **Ultimate** team.\n\nThe Ultimate team leads are **<@179308376650416128>** and **<@97043736063668224>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=UltimateSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
-
-
-        if message.content.lower() == "i would like to help with guilty gear":
+        if message.content.lower() == "i would like to help with melee":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**GUILTY GEAR SHIFT SIGNUPS**\n\nThanks for offering to help with the **Guilty Gear** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=GuiltyGearSelectView())
+            await message.author.send(f"**MELEE SHIFT SIGNUPS**\n\nThanks for offering to help with the **Melee** team.\n\nThe Melee team leads are **<@327166415713075212>** and **<@522869098707681306>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=MeleeSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
-
-
-        if message.content.lower() == "i would like to help with sf6":
+        if message.content.lower() == "i would like to help with rivals":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**SF6 SHIFT SIGNUPS**\n\nThanks for offering to help with the **SF6** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=SF6SelectView())
+            await message.author.send(f"**RIVALS SHIFT SIGNUPS**\n\nThanks for offering to help with the **Rivals** team.\n\nThe Rivals team leads are **<@184475408723345408>** and **<@170936281038192641>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=RivalsSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
-
+        if message.content.lower() == "i would like to help with street fighter":
+            # Send a DM to the user with the Shift Signup dropdown
+            await message.author.send(f"**STREET FIGHTER SHIFT SIGNUPS**\n\nThanks for offering to help with the **Street Fighter** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=StreetFighterSelectView())
+            
+            # Acknowledge the user's message with an emote react.
+            await message.add_reaction("✅")
+        
         if message.content.lower() == "i would like to help with tekken":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**TEKKEN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Tekken** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=TekkenSelectView())
+            await message.author.send(f"**TEKKEN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Tekken** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=TekkenSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
-
         
-        if message.content.lower() == "i would like to help with rushdown":
+        if message.content.lower() == "i would like to help with guilty gear":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**RUSHDOWN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Rushdown** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=RushdownSelectView())
+            await message.author.send(f"**GUILTY GEAR SHIFT SIGNUPS**\n\nThanks for offering to help with the **Guilty Gear** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=GuiltyGearSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
-        
-
-        if message.content.lower() == "i would like to help with brackets on demand":
+        if message.content.lower() == "i would like to help with degenesis":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**BRACKETS ON DEMAND SHIFT SIGNUPS**\n\nThanks for offering to help with the **Brackets On Demand** team.\n\nThe Brackets On Demand team leads are **<@154768322787934208>** and **<@167122411802591232>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=BracketsOnDemandSelectView())
+            await message.author.send(f"**DATA ENTRY SHIFT SIGNUPS**\n\nThanks for offering to help with the **Degenesis** team.\n\nThe Degenesis team lead is **<@175419147008606208>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=DegenesisSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
-        
-
         if message.content.lower() == "i would like to help with data entry":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**DATA ENTRY SHIFT SIGNUPS**\n\nThanks for offering to help with the **Data Entry** team.\n\nThe Data Entry team leads are **<@92840691301900288>** and **<@133765875907035138>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=DataEntrySelectView())
+            await message.author.send(f"**DATA ENTRY SHIFT SIGNUPS**\n\nThanks for offering to help with the **Data Entry** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=DataEntrySelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
-
-
-        if message.content.lower() == "i would like to help with merch":
+        if message.content.lower() == "i would like to help with brackets on demand":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**MERCH SHIFT SIGNUPS**\n\nThanks for offering to help with the **Merch** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=MerchSelectView())
+            await message.author.send(f"**BRACKETS ON DEMAND SHIFT SIGNUPS**\n\nThanks for offering to help with the **Brackets On Demand** team.\n\nThe Brackets On Demand team lead is  **<@167122411802591232>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=BracketsOnDemandSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
-
-
-
+        if message.content.lower() == "i would like to help with info desk":
+            # Send a DM to the user with the Shift Signup dropdown
+            await message.author.send(f"**INFO DESK SHIFT SIGNUPS**\n\nThanks for offering to help with the **INFO DESK** team.\n\nThe Info Desk team lead is  **<@406636968798191617>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=InfoDeskSelectView())
+            
+            # Acknowledge the user's message with an emote react.
+            await message.add_reaction("✅")
+        
         if message.content.lower() == "i would like to help with floater":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**FLOATER SHIFT SIGNUPS**\n\nThanks for offering to help with the **Floater** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **2 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n\n​",view=FloaterSelectView())
+            await message.author.send(f"**FLOATER SHIFT SIGNUPS**\n\nThanks for offering to help with the **Floater** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n\n​",view=FloaterSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
-
         if message.content.lower() == "what are my shifts?":
             await message.add_reaction("✅")
         
             get_values.cache_clear()
             latest_data = get_values(os.getenv('SHEET_SHIFT_SIGNUPS'), 'Sign Up')
-            day_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/15")
+            day_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")
 
             day_column = day_cell['column_index']
             day_row = day_cell['row_index']
@@ -1745,7 +2120,7 @@ class VolunteerCommands(commands.Cog):
 
             
             
-            for column in range(day_column, len(latest_data[0]), 2):
+            for column in range(day_column, len(latest_data[0]), 1):
                 if day_text != latest_data[day_row][column] and len(latest_data[day_row][column]) > 1:
                     day_text = latest_data[day_row][column]
                 if (len(latest_data[requester_row][column]) > 1):
@@ -1768,8 +2143,8 @@ class VolunteerCommands(commands.Cog):
 
 
     ## Loops
-
-    @tasks.loop(seconds=60.0)
+    # loop every 60 seconds to prevent going over rate limit
+    @tasks.loop(seconds=15.0)
     async def process_requests(self):
         logger.info(f'Processing next request. There are {requests_queue.qsize()} requests left in the request queue.')
         
@@ -1784,10 +2159,14 @@ class VolunteerCommands(commands.Cog):
         logger.info(f"Processing {request.requester}'s request to help with {request.shift_type} on {request.shift_day}, starting at {request.shift_time}")
         
         if (request.is_available()):
+            logger.info(f"{request.requester}'s request to help with {request.shift_type} on {request.shift_day}, starting at {request.shift_time} is available.")
+        
             request.assign()
             await request.interaction.followup.send(content=f"```diff\n+ Your ({request.requester}) request to help with {request.shift_type} on {request.shift_day}, starting at {request.shift_time}, has been successfully assigned!```")
             logger.info(f"{request.requester}'s has been assigned to help with {request.shift_type} on {request.shift_day}, starting at {request.shift_time}")
         else:
+            logger.info(f"{request.requester}'s request to help with {request.shift_type} on {request.shift_day}, starting at {request.shift_time} is NOT available.")
+        
             await request.interaction.followup.send(content=f"```diff\n- Your ({request.requester}) request to help with {request.shift_type} on {request.shift_day}, starting at {request.shift_time}, is unavailable```")
             logger.info(f"Request is unavailable.")
 
