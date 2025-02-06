@@ -26,6 +26,7 @@ import re  # regular expressions to parse certain strings
 from pprint import pprint  # to pretty print lists and dictionaries
 from functools import lru_cache  # Least Recently Used Cache so we don't have to pound the APIs
 #from emoji import UNICODE_EMOJI
+from utils.spreadsheet import *
 
 
 
@@ -150,7 +151,31 @@ class ShiftValidationCommands(commands.Cog):
         await ctx.message.delete()
         return
 
+    @commands.command()
+    # Type "!notifyRewards <user> <message>" to notify <user> of their rewards (<message>).
+    async def notify_rewards(self, ctx, user_name, *, msg):
+        # user = None
 
+        volunteer_data = get_values(spreadsheet=os.getenv('SHEET_DISCORD_MEMBERS'), sheet='SYF')
+        #print(volunteer_data)
+        user_data = None
+        # Currently hardcoded, would want to update to be dynamic
+        id_col = 0
+        name_col = 1
+        nick_col = 3
+        for user_details in volunteer_data[1:]:  # ignore the header line, cause im not dealing with pandas at the moment
+            if user_name.lower() in [user_details[name_col].lower(), user_details[nick_col].lower()]:
+                user_data = user_details
+                print(f"user is {user_data}")
+                break
+        if user_data is None:
+            print(f"User {user_name} not found")
+            await ctx.message.delete()
+            return
+
+        user = self.bot.get_user(int(user_data[id_col]))
+        await user.send(msg)
+        await ctx.message.delete()
 
 
 async def setup(bot):
