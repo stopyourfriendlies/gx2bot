@@ -151,31 +151,37 @@ class ShiftValidationCommands(commands.Cog):
         await ctx.message.delete()
         return
 
-    @commands.command()
-    # Type "!notifyRewards <user> <message>" to notify <user> of their rewards (<message>).
-    async def notify_rewards(self, ctx, user_name, *, msg):
-        # user = None
+    @commands.Cog.listener("on_message")
+    async def notify_rewards_from_webhook(self, msg):
+        if msg.webhook_id == 1337111947551703142:
+            # parse the msg
+            content = msg.content
+            command = content.split()[0]
+            if command != "!notify_rewards":
+                return  # something else, not handling here
 
-        volunteer_data = get_values(spreadsheet=os.getenv('SHEET_DISCORD_MEMBERS'), sheet='SYF')
-        #print(volunteer_data)
-        user_data = None
-        # Currently hardcoded, would want to update to be dynamic
-        id_col = 0
-        name_col = 1
-        nick_col = 3
-        for user_details in volunteer_data[1:]:  # ignore the header line, cause im not dealing with pandas at the moment
-            if user_name.lower() in [user_details[name_col].lower(), user_details[nick_col].lower()]:
-                user_data = user_details
-                print(f"user is {user_data}")
-                break
-        if user_data is None:
-            print(f"User {user_name} not found")
-            await ctx.message.delete()
-            return
+            user_name = content.split()[1]
+            message = " ".join(content.split()[2:])
 
-        user = self.bot.get_user(int(user_data[id_col]))
-        await user.send(msg)
-        await ctx.message.delete()
+            volunteer_data = get_values(spreadsheet=os.getenv('SHEET_DISCORD_MEMBERS'), sheet='SYF')
+            #print(volunteer_data)
+            user_data = None
+            # Currently hardcoded, would want to update to be dynamic
+            id_col = 0
+            name_col = 1
+            nick_col = 3
+            for user_details in volunteer_data[1:]:  # ignore the header line, cause im not dealing with pandas at the moment
+                if user_name.lower() in [user_details[name_col].lower(), user_details[nick_col].lower()]:
+                    user_data = user_details
+                    break
+            if user_data is None:
+                print(f"User {user_name} not found")
+                await msg.delete()
+                return
+
+            user = self.bot.get_user(int(user_data[id_col]))
+            await user.send(message)
+            await msg.delete()
 
 
 async def setup(bot):
