@@ -2042,28 +2042,28 @@ class VolunteerCommands(commands.Cog):
         
         if message.content.lower() == "i would like to help with street fighter":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**STREET FIGHTER SHIFT SIGNUPS**\n\nThanks for offering to help with the **Street Fighter** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=StreetFighterSelectView())
+            await message.author.send(f"**STREET FIGHTER SHIFT SIGNUPS**\n\nThanks for offering to help with the **Street Fighter** team.\n\nThe Street Fighter team lead is **<@176612585120989184>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=StreetFighterSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
         if message.content.lower() == "i would like to help with tekken":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**TEKKEN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Tekken** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=TekkenSelectView())
+            await message.author.send(f"**TEKKEN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Tekken** team.\n\nThe Tekken team lead is **<@670850926432616468>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=TekkenSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
         if message.content.lower() == "i would like to help with guilty gear":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**GUILTY GEAR SHIFT SIGNUPS**\n\nThanks for offering to help with the **Guilty Gear** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=GuiltyGearSelectView())
+            await message.author.send(f"**GUILTY GEAR SHIFT SIGNUPS**\n\nThanks for offering to help with the **Guilty Gear** team.\n\nThe Guilty Gear team lead is **<@140318095888744448>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=GuiltyGearSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
         
         if message.content.lower() == "i would like to help with degenesis":
             # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(f"**DATA ENTRY SHIFT SIGNUPS**\n\nThanks for offering to help with the **Degenesis** team.\n\nThe Degenesis team lead is **<@175419147008606208>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=DegenesisSelectView())
+            await message.author.send(f"**DEGENESIS SHIFT SIGNUPS**\n\nThanks for offering to help with the **Degenesis** team.\n\nThe Degenesis team lead is **<@175419147008606208>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",view=DegenesisSelectView())
             
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
