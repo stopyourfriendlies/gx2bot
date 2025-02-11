@@ -171,6 +171,7 @@ class ShiftValidationCommands(commands.Cog):
             id_col = 0
             name_col = 1
             nick_col = 3
+            # TODO Change to get_requester_row
             for user_details in volunteer_data[1:]:  # ignore the header line, cause im not dealing with pandas at the moment
                 if user_name.lower() in [user_details[name_col].lower(), user_details[nick_col].lower()]:
                     user_data = user_details
