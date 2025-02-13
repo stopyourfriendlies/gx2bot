@@ -57,78 +57,6 @@ gc = gspread.service_account(filename='credentials.json')
 ### FUNCTIONS
 
 
-
-# Type "!purge_role [role_name]" in a channel to remove all users from that role.
-async def purge_role(self, role_name):
-    logger.info(f"purge_role fired for {role_name} Role.")
-
-    logger.info(f"grabbing guild object")
-    try:
-        guild = get(self.bot.guilds, name="Stop Your Friendlies")
-    except:
-        logger.error(f"failed to grab guild object")
-        return
-
-    logger.info(f"grabbing role object")
-    try:
-        role = get(guild.roles, name=role_name)
-    except:
-        logger.error(f"failed to grab role object")
-        return
-
-    if role is None:
-        logger.warning(f"{role_name} Role cannot be purged since it cannot be found.")
-        return
-
-    # Cycle through each member that has the Role and remove the Role.
-    for member in role.members:
-        logger.info(f"{role_name} Role removed from {member}.")
-        await member.remove_roles(role)
-
-    logger.info(f"purge_role finished. {role_name} purged of members.")
-    return
-
-# Type "!purge_channel [channel_name]" in a channel to remove all messages from that channel.
-async def purge_channel(self, channel_name):
-    logger.info(f"purge_channel fired for #{channel_name}.")
-
-    logger.info(f"grabbing guild object")
-    try:
-        guild = get(self.bot.guilds, name="Stop Your Friendlies")
-    except:
-        logger.error(f"failed to grab guild object")
-        return
-
-    if (guild is None):
-        logger.error(f"guild object is None")
-        return
-
-    logger.info(f"grabbing channel object")
-    try:
-        channel = get(self.bot.get_all_channels(), name=channel_name)
-    except:
-        logger.error(f"failed to grab channel object")
-        return
-
-    if (channel is None):
-        logger.error(f"channel object is None")
-        return
-
-    # Purge messages from the Channel.
-    logger.info(f"purging channel of messages")
-    try:
-        await channel.purge()
-    except:
-        logger.error(f"purging messages failed")
-        return
-
-    logger.info(f"#{channel_name} purged of messages.")
-    return
-
-
-
-
-
 ### CLASS
 
 class ShiftValidationCommands(commands.Cog):
@@ -154,7 +82,7 @@ class ShiftValidationCommands(commands.Cog):
     @commands.Cog.listener("on_message")
     async def notify_rewards_from_webhook(self, msg):
         # TODO: Change hardcoded webhook id
-        if msg.webhook_id == 1337111947551703142:
+        if msg.webhook_id == 1339492277575352351:  # Genesis webhook for #bot-logging, "Shifty Boy"
             # parse the msg
             content = msg.content
             command = content.split()[0]
@@ -173,7 +101,7 @@ class ShiftValidationCommands(commands.Cog):
             nick_col = 3
             # TODO Change to get_requester_row
             for user_details in volunteer_data[1:]:  # ignore the header line, cause im not dealing with pandas at the moment
-                if user_name.lower() in [user_details[name_col].lower(), user_details[nick_col].lower()]:
+                if user_name.lower() in [user_details[nick_col].lower()]:
                     user_data = user_details
                     break
             if user_data is None:
