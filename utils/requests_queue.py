@@ -1,4 +1,4 @@
-#import queue stuff
+# import queue stuff
 import queue
-requests_queue = queue.Queue()
 
+requests_queue = queue.Queue()

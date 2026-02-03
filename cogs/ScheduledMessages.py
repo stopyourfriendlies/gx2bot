@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 import re
 from zoneinfo import ZoneInfo
 import zoneinfo
+
 # from pytz import timezone
 import pytz
+
 # from pytz import all_timezones
 # import time
 import asyncio
@@ -21,14 +23,15 @@ import logging
 
 # load environment variables from .env
 from dotenv import load_dotenv
+
 load_dotenv()
 
 
 # set credentials to use on the google sheet
-gc = gspread.service_account(filename='./credentials.json')
+gc = gspread.service_account(filename="./credentials.json")
 
 # Open a sheet from a spreadsheet in one go
-scheduled_messages_sheet = gc.open(os.getenv('SHEET_SCHEDULED_MESSAGES'))
+scheduled_messages_sheet = gc.open(os.getenv("SHEET_SCHEDULED_MESSAGES"))
 
 
 class ScheduledMessages(commands.Cog):
@@ -43,12 +46,11 @@ class ScheduledMessages(commands.Cog):
     # Events
     @commands.Cog.listener()
     async def on_ready(self):
-        print('Scheduled Messages ready')
+        print("Scheduled Messages ready")
 
     @tasks.loop(seconds=30.0)
     async def printer(self):
-        messages = scheduled_messages_sheet.worksheet(
-            "Scheduler").get_all_values()
+        messages = scheduled_messages_sheet.worksheet("Scheduler").get_all_values()
         # print(messages)
         # messages[1][2] = "OVERWRITE"
 
@@ -72,71 +74,92 @@ class ScheduledMessages(commands.Cog):
             if messages[i][status_index] == "SENT":
                 continue
 
-            if messages[i][date_index] == "" or messages[i][time_index] == "" or messages[i][channel_id_index] == "":
+            if (
+                messages[i][date_index] == ""
+                or messages[i][time_index] == ""
+                or messages[i][channel_id_index] == ""
+            ):
                 continue
 
             channel = self.bot.get_channel(int(messages[i][channel_id_index]))
 
-            parsed_date_split = messages[i][date_index].split('/')
+            parsed_date_split = messages[i][date_index].split("/")
             parsed_month = parsed_date_split[0].zfill(2)
             parsed_day = parsed_date_split[1].zfill(2)
             parsed_year = parsed_date_split[2]
             # print(parsed_date_split)
 
-            parsed_time_split = re.split(r'\W', messages[i][time_index])
+            parsed_time_split = re.split(r"\W", messages[i][time_index])
             parsed_hour = parsed_time_split[0].zfill(2)
             parsed_minute = parsed_time_split[1].zfill(2)
             parsed_AMPM = parsed_time_split[2]
             # print(parsed_time_split)
 
-            msgDateTime = parsed_month + "/" + parsed_day + "/" + parsed_year + \
-                " " + parsed_hour + ":" + parsed_minute + " " + parsed_AMPM
+            msgDateTime = (
+                parsed_month
+                + "/"
+                + parsed_day
+                + "/"
+                + parsed_year
+                + " "
+                + parsed_hour
+                + ":"
+                + parsed_minute
+                + " "
+                + parsed_AMPM
+            )
             # print(msgDateTime)
-            msgDateTimeFormat = '%m/%d/%Y %I:%M %p'
+            msgDateTimeFormat = "%m/%d/%Y %I:%M %p"
 
             parsed_time = datetime.strptime(msgDateTime, msgDateTimeFormat)
             # parsed_time = datetime(int(parsed_year), int(parsed_month), int(parsed_day), int(parsed_hour), int(parsed_minute), 0, 0)
 
             # print(parsed_time.strftime(msgDateTimeFormat))
 
-            tz = pytz.timezone('America/Los_Angeles')
+            tz = pytz.timezone("America/Los_Angeles")
             current_date = datetime.now(tz)
 
             # print(current_date.strftime(msgDateTimeFormat))
             # message[status_index] = "Valid"
 
-            if (parsed_time.strftime(msgDateTimeFormat) == current_date.strftime(msgDateTimeFormat)):
+            if parsed_time.strftime(msgDateTimeFormat) == current_date.strftime(
+                msgDateTimeFormat
+            ):
                 print("match time")
 
                 embed_var = discord.Embed()
 
-                if (messages[i][embed_color_hex_index] != "" and messages[i][embed_title_index] != "" and messages[i][embed_description_index] != ""):
+                if (
+                    messages[i][embed_color_hex_index] != ""
+                    and messages[i][embed_title_index] != ""
+                    and messages[i][embed_description_index] != ""
+                ):
                     embed_var.title = messages[i][embed_title_index]
                     embed_var.description = messages[i][embed_description_index]
-                    embed_var.color = int(
-                        messages[i][embed_color_hex_index], 0)
+                    embed_var.color = int(messages[i][embed_color_hex_index], 0)
 
-                    if (messages[i][embed_footer_index] != ""):
-                        embed_var.set_footer(
-                            text=messages[i][embed_footer_index])
+                    if messages[i][embed_footer_index] != "":
+                        embed_var.set_footer(text=messages[i][embed_footer_index])
 
-                    if (messages[i][embed_image_index] != ""):
+                    if messages[i][embed_image_index] != "":
                         embed_var.set_image(url=messages[i][embed_image_index])
 
-                    if (messages[i][embed_thumbnail_index] != ""):
-                        embed_var.set_thumbnail(
-                            url=messages[i][embed_thumbnail_index])
+                    if messages[i][embed_thumbnail_index] != "":
+                        embed_var.set_thumbnail(url=messages[i][embed_thumbnail_index])
 
                     await channel.send(messages[i][message_index], embed=embed_var)
                     messages[i][status_index] = "SENT"
                     scheduled_messages_sheet.worksheet("Scheduler").update(
-                        'B1:B' + str(len(messages)), [sublist[1:2] for sublist in messages])
+                        "B1:B" + str(len(messages)),
+                        [sublist[1:2] for sublist in messages],
+                    )
                     continue
 
                 await channel.send(messages[i][message_index])
                 messages[i][status_index] = "SENT"
                 scheduled_messages_sheet.worksheet("Scheduler").update(
-                    'B1:B' + str(len(messages)), [sublist[1:2] for sublist in messages])
+                    "B1:B" + str(len(messages)), [sublist[1:2] for sublist in messages]
+                )
                 continue
 
             # except:
@@ -170,7 +193,7 @@ class ScheduledMessages(commands.Cog):
         #     print("YAY!")
 
     # Commands
-    @ commands.command()
+    @commands.command()
     async def getChannels(self, ctx):
         # id_list = scheduled_messages_sheet.col_values(1)
         # username_list = subscribersSheet.col_values(2)
@@ -180,8 +203,20 @@ class ScheduledMessages(commands.Cog):
 
         for channel in ctx.message.guild.text_channels:
             print(channel.category)
-            output.append([str(channel.guild.name), str(channel.guild.id), str(channel.position), str(channel.category), str(
-                channel.category_id), str(channel.name), str(channel.id), str(channel.type), channel.topic, channel.nsfw])
+            output.append(
+                [
+                    str(channel.guild.name),
+                    str(channel.guild.id),
+                    str(channel.position),
+                    str(channel.category),
+                    str(channel.category_id),
+                    str(channel.name),
+                    str(channel.id),
+                    str(channel.type),
+                    channel.topic,
+                    channel.nsfw,
+                ]
+            )
 
             # scheduled_messages_sheet.worksheet("Channels").append_row(
             #     [str(channel.guild.id), str(channel.guild.name), str(channel.position), str(channel.category_id), str(channel.category), str(channel.id), str(channel.name), channel.nsfw, channel.topic, str(channel.type)])
@@ -193,7 +228,7 @@ class ScheduledMessages(commands.Cog):
 
         await ctx.message.delete()
 
-    @ commands.command()
+    @commands.command()
     async def getRoles(self, ctx):
         # id_list = scheduled_messages_sheet.col_values(1)
         # username_list = subscribersSheet.col_values(2)
@@ -203,8 +238,20 @@ class ScheduledMessages(commands.Cog):
 
         for channel in ctx.message.guild.text_channels:
             print(channel.category)
-            output.append([str(channel.guild.name), str(channel.guild.id), str(channel.position), str(channel.category), str(
-                channel.category_id), str(channel.name), str(channel.id), str(channel.type), channel.topic, channel.nsfw])
+            output.append(
+                [
+                    str(channel.guild.name),
+                    str(channel.guild.id),
+                    str(channel.position),
+                    str(channel.category),
+                    str(channel.category_id),
+                    str(channel.name),
+                    str(channel.id),
+                    str(channel.type),
+                    channel.topic,
+                    channel.nsfw,
+                ]
+            )
 
             # scheduled_messages_sheet.worksheet("Channels").append_row(
             #     [str(channel.guild.id), str(channel.guild.name), str(channel.position), str(channel.category_id), str(channel.category), str(channel.id), str(channel.name), channel.nsfw, channel.topic, str(channel.type)])
@@ -216,10 +263,9 @@ class ScheduledMessages(commands.Cog):
 
         await ctx.message.delete()
 
-    @ commands.command()
+    @commands.command()
     async def testScheduledMessages(self, ctx):
-        messages = scheduled_messages_sheet.worksheet(
-            "Scheduler").get_all_values()
+        messages = scheduled_messages_sheet.worksheet("Scheduler").get_all_values()
 
         print("Test Scheduled Messages Fired")
 
@@ -243,41 +289,49 @@ class ScheduledMessages(commands.Cog):
             if messages[i][status_index] == "SENT":
                 continue
 
-            if messages[i][date_index] == "" or messages[i][time_index] == "" or messages[i][channel_id_index] == "":
+            if (
+                messages[i][date_index] == ""
+                or messages[i][time_index] == ""
+                or messages[i][channel_id_index] == ""
+            ):
                 continue
 
-            if (str(messages[i][test_index]) == "TRUE"):
+            if str(messages[i][test_index]) == "TRUE":
                 print("Test Requested")
 
                 embed_var = discord.Embed()
 
-                if (messages[i][embed_color_hex_index] != "" and messages[i][embed_title_index] != "" and messages[i][embed_description_index] != ""):
+                if (
+                    messages[i][embed_color_hex_index] != ""
+                    and messages[i][embed_title_index] != ""
+                    and messages[i][embed_description_index] != ""
+                ):
                     embed_var.title = messages[i][embed_title_index]
                     embed_var.description = messages[i][embed_description_index]
-                    embed_var.color = int(
-                        messages[i][embed_color_hex_index], 0)
+                    embed_var.color = int(messages[i][embed_color_hex_index], 0)
 
-                    if (messages[i][embed_footer_index] != ""):
-                        embed_var.set_footer(
-                            text=messages[i][embed_footer_index])
+                    if messages[i][embed_footer_index] != "":
+                        embed_var.set_footer(text=messages[i][embed_footer_index])
 
-                    if (messages[i][embed_image_index] != ""):
+                    if messages[i][embed_image_index] != "":
                         embed_var.set_image(url=messages[i][embed_image_index])
 
-                    if (messages[i][embed_thumbnail_index] != ""):
-                        embed_var.set_thumbnail(
-                            url=messages[i][embed_thumbnail_index])
+                    if messages[i][embed_thumbnail_index] != "":
+                        embed_var.set_thumbnail(url=messages[i][embed_thumbnail_index])
 
                     await ctx.send(messages[i][message_index], embed=embed_var)
                     messages[i][status_index] = "TESTED"
                     scheduled_messages_sheet.worksheet("Scheduler").update(
-                        'B1:B' + str(len(messages)), [sublist[1:2] for sublist in messages])
+                        "B1:B" + str(len(messages)),
+                        [sublist[1:2] for sublist in messages],
+                    )
                     continue
 
                 await ctx.send(messages[i][message_index])
                 messages[i][status_index] = "TESTED"
                 scheduled_messages_sheet.worksheet("Scheduler").update(
-                    'B1:B' + str(len(messages)), [sublist[1:2] for sublist in messages])
+                    "B1:B" + str(len(messages)), [sublist[1:2] for sublist in messages]
+                )
                 continue
 
             # except:
@@ -288,6 +342,7 @@ class ScheduledMessages(commands.Cog):
 
 # def setup(bot):
 #     bot.add_cog(ScheduledMessages(bot))
+
 
 async def setup(bot):
     await bot.add_cog(ScheduledMessages(bot))

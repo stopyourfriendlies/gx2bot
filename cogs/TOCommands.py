@@ -1,7 +1,6 @@
 ### SETUP
 
 
-
 ## Imports
 
 # import discord.py libraries to interact with Discord
@@ -24,37 +23,38 @@ import logging  # to log obviously
 import os  # to get local files like credentials and such
 import re  # regular expressions to parse certain strings
 from pprint import pprint  # to pretty print lists and dictionaries
-from functools import lru_cache  # Least Recently Used Cache so we don't have to pound the APIs
-#from emoji import UNICODE_EMOJI
+from functools import (
+    lru_cache,
+)  # Least Recently Used Cache so we don't have to pound the APIs
 
+# from emoji import UNICODE_EMOJI
 
 
 ## Logging
 
-logger = logging.getLogger('TO')  # set up a log called 'TO'
-logger.setLevel(logging.INFO)  # set Logging Level (DEBUG, INFO, WARNING, ERROR, CRITICAL) to only show info level and up
+logger = logging.getLogger("TO")  # set up a log called 'TO'
+logger.setLevel(
+    logging.INFO
+)  # set Logging Level (DEBUG, INFO, WARNING, ERROR, CRITICAL) to only show info level and up
 
 # output log to file
-handler = logging.FileHandler(filename='TOCommands.log', encoding='utf-8', mode='w')
-handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))  # change this if you want log items formatted differently
+handler = logging.FileHandler(filename="TOCommands.log", encoding="utf-8", mode="w")
+handler.setFormatter(
+    logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
+)  # change this if you want log items formatted differently
 logger.addHandler(handler)
-
 
 
 ## Google Sheets setup
 
 # set credentials to use on the google sheet
-gc = gspread.service_account(filename='credentials.json')
+gc = gspread.service_account(filename="credentials.json")
 
 # Open a sheet from a spreadsheet in one go
-gx2_discord_members_spreadsheet = gc.open(os.getenv('SHEET_DISCORD_MEMBERS'))
-
-
-
+gx2_discord_members_spreadsheet = gc.open(os.getenv("SHEET_DISCORD_MEMBERS"))
 
 
 ### FUNCTIONS
-
 
 
 # Type "!purge_role [role_name]" in a channel to remove all users from that role.
@@ -67,14 +67,14 @@ async def purge_role(self, role_name):
     except:
         logger.error(f"failed to grab guild object")
         return
-    
+
     logger.info(f"grabbing role object")
     try:
         role = get(guild.roles, name=role_name)
     except:
         logger.error(f"failed to grab role object")
         return
-    
+
     if role is None:
         logger.warning(f"{role_name} Role cannot be purged since it cannot be found.")
         return
@@ -87,6 +87,7 @@ async def purge_role(self, role_name):
     logger.info(f"purge_role finished. {role_name} purged of members.")
     return
 
+
 # Type "!purge_channel [channel_name]" in a channel to remove all messages from that channel.
 async def purge_channel(self, channel_name):
     logger.info(f"purge_channel fired for #{channel_name}.")
@@ -98,21 +99,21 @@ async def purge_channel(self, channel_name):
         logger.error(f"failed to grab guild object")
         return
 
-    if (guild is None):
+    if guild is None:
         logger.error(f"guild object is None")
         return
-    
+
     logger.info(f"grabbing channel object")
     try:
         channel = get(self.bot.get_all_channels(), name=channel_name)
     except:
         logger.error(f"failed to grab channel object")
         return
-    
-    if (channel is None):
+
+    if channel is None:
         logger.error(f"channel object is None")
         return
-    
+
     # Purge messages from the Channel.
     logger.info(f"purging channel of messages")
     try:
@@ -125,24 +126,22 @@ async def purge_channel(self, channel_name):
     return
 
 
-
-
-
 ### CLASS
 
+
 class TOCommands(commands.Cog):
-    
+
     ## Events
-    
+
     def __init__(self, bot):
         self.bot = bot
 
     async def cog_load(self):
-        print('TO Commands ready')
+        print("TO Commands ready")
         logger.info("TOCommands Cog loaded.")
-    
+
     ## Commands
-        
+
     # Type "!getMembersInRole [role_name]" to populate the specified Google Sheet with Members of that Role.
     @commands.command()
     async def getMembersInRole(self, ctx, role_name):
@@ -152,11 +151,20 @@ class TOCommands(commands.Cog):
             if role.name == role_name:
                 # print(role.members)
                 for member in role.members:
-                    output.append([str(member.id), str(member.name), str(member.discriminator), str(
-                        member.nick), member.bot, str(member.guild.name), str(member.guild.id)])
+                    output.append(
+                        [
+                            str(member.id),
+                            str(member.name),
+                            str(member.discriminator),
+                            str(member.nick),
+                            member.bot,
+                            str(member.guild.name),
+                            str(member.guild.id),
+                        ]
+                    )
 
-        # Sanity Check to make sure there are actually members that have the role before continuing.        
-        if (len(output) <= 0):
+        # Sanity Check to make sure there are actually members that have the role before continuing.
+        if len(output) <= 0:
             await ctx.message.delete()
             return
 
@@ -166,11 +174,23 @@ class TOCommands(commands.Cog):
         except:
             # If the sheet doesn't exist for that role, create it
             sheet = gx2_discord_members_spreadsheet.add_worksheet(
-                title=role_name, rows=100, cols=20)
-            
+                title=role_name, rows=100, cols=20
+            )
+
             # Create header for the new sheet
-            output.insert(0, ["ID", "Name", "Discriminator", "Nick",
-                          "Bot?", "Guild Name", "Guild ID", "Joined Names"])
+            output.insert(
+                0,
+                [
+                    "ID",
+                    "Name",
+                    "Discriminator",
+                    "Nick",
+                    "Bot?",
+                    "Guild Name",
+                    "Guild ID",
+                    "Joined Names",
+                ],
+            )
 
         # Insert the Members into the Sheet
         sheet.append_rows(output)
@@ -191,7 +211,6 @@ class TOCommands(commands.Cog):
     async def cmd_clear_channel(self, ctx, channel_name):
         await purge_channel(self, channel_name)
         await ctx.message.delete()
-
 
 
 async def setup(bot):

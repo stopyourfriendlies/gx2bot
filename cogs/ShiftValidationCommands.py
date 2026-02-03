@@ -1,7 +1,6 @@
 ### SETUP
 
 
-
 ## Imports
 
 # import discord.py libraries to interact with Discord
@@ -24,38 +23,40 @@ import logging  # to log obviously
 import os  # to get local files like credentials and such
 import re  # regular expressions to parse certain strings
 from pprint import pprint  # to pretty print lists and dictionaries
-from functools import lru_cache  # Least Recently Used Cache so we don't have to pound the APIs
-#from emoji import UNICODE_EMOJI
+from functools import (
+    lru_cache,
+)  # Least Recently Used Cache so we don't have to pound the APIs
+
+# from emoji import UNICODE_EMOJI
 from utils.spreadsheet import *
-
-
 
 ## Logging
 
-logger = logging.getLogger('ShiftValidation')  # set up a log
-logger.setLevel(logging.INFO)  # set Logging Level (DEBUG, INFO, WARNING, ERROR, CRITICAL) to only show info level and up
+logger = logging.getLogger("ShiftValidation")  # set up a log
+logger.setLevel(
+    logging.INFO
+)  # set Logging Level (DEBUG, INFO, WARNING, ERROR, CRITICAL) to only show info level and up
 
 # output log to file
-handler = logging.FileHandler(filename='ShiftValidationCommands.log', encoding='utf-8', mode='w')
-handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))  # change this if you want log items formatted differently
+handler = logging.FileHandler(
+    filename="ShiftValidationCommands.log", encoding="utf-8", mode="w"
+)
+handler.setFormatter(
+    logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
+)  # change this if you want log items formatted differently
 logger.addHandler(handler)
-
 
 
 ## Google Sheets setup
 
 # set credentials to use on the google sheet
-gc = gspread.service_account(filename='credentials.json')
+gc = gspread.service_account(filename="credentials.json")
 
 # Open a sheet from a spreadsheet in one go
 # gx2_discord_members_spreadsheet = gc.open(os.getenv('SHEET_DISCORD_MEMBERS'))
 
 
-
-
-
 ### FUNCTIONS
-
 
 
 # Type "!purge_role [role_name]" in a channel to remove all users from that role.
@@ -88,6 +89,7 @@ async def purge_role(self, role_name):
     logger.info(f"purge_role finished. {role_name} purged of members.")
     return
 
+
 # Type "!purge_channel [channel_name]" in a channel to remove all messages from that channel.
 async def purge_channel(self, channel_name):
     logger.info(f"purge_channel fired for #{channel_name}.")
@@ -99,7 +101,7 @@ async def purge_channel(self, channel_name):
         logger.error(f"failed to grab guild object")
         return
 
-    if (guild is None):
+    if guild is None:
         logger.error(f"guild object is None")
         return
 
@@ -110,7 +112,7 @@ async def purge_channel(self, channel_name):
         logger.error(f"failed to grab channel object")
         return
 
-    if (channel is None):
+    if channel is None:
         logger.error(f"channel object is None")
         return
 
@@ -126,10 +128,8 @@ async def purge_channel(self, channel_name):
     return
 
 
-
-
-
 ### CLASS
+
 
 class ShiftValidationCommands(commands.Cog):
 
@@ -139,7 +139,7 @@ class ShiftValidationCommands(commands.Cog):
         self.bot = bot
 
     async def cog_load(self):
-        print('Shift Validation Commands ready')
+        print("Shift Validation Commands ready")
         logger.info("ShiftValidationCommands Cog loaded.")
 
     ## Commands
@@ -164,16 +164,23 @@ class ShiftValidationCommands(commands.Cog):
             user_name = content.split()[1]
             message = " ".join(content.split()[2:])
 
-            volunteer_data = get_values(spreadsheet=os.getenv('SHEET_DISCORD_MEMBERS'), sheet='SYF')
-            #print(volunteer_data)
+            volunteer_data = get_values(
+                spreadsheet=os.getenv("SHEET_DISCORD_MEMBERS"), sheet="SYF"
+            )
+            # print(volunteer_data)
             user_data = None
             # Currently hardcoded, would want to update to be dynamic
             id_col = 0
             name_col = 1
             nick_col = 3
             # TODO Change to get_requester_row
-            for user_details in volunteer_data[1:]:  # ignore the header line, cause im not dealing with pandas at the moment
-                if user_name.lower() in [user_details[name_col].lower(), user_details[nick_col].lower()]:
+            for user_details in volunteer_data[
+                1:
+            ]:  # ignore the header line, cause im not dealing with pandas at the moment
+                if user_name.lower() in [
+                    user_details[name_col].lower(),
+                    user_details[nick_col].lower(),
+                ]:
                     user_data = user_details
                     break
             if user_data is None:
