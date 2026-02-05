@@ -38,6 +38,8 @@ import queue
 
 from utils.spreadsheet import *
 
+THURSDAY_COL_HEADER = "Thursday 2/12"
+
 ## Logging
 
 logger = logging.getLogger("Volunteer")  # set up a log called 'TO'
@@ -223,7 +225,7 @@ class ShiftRequest:
 # To add a new Select Response, copy an existing one and change the following:
 #
 # 1. modify the name of the class so 'class CheckInSelect(discord.ui.Select):' becomes 'class WhateverSelect(discord.ui.Select):'
-# 2. make sure the anchor cell value refer what it is in the shift signup google sheet 'thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value="Thursday 2/13")'       '
+# 2. make sure the anchor cell value refer what it is in the shift signup google sheet 'thursday_cell = get_cell_indexes(spreadsheet=os.getenv('SHEET_SHIFT_SIGNUPS'), sheet='Sign Up', value=THURSDAY_COL_HEADER)'       '
 # 3. modify shift_type is changed in __init__. so 'shift_type = "Check-In"' becomes 'shift_type = "Whatever"'
 # 4. modify shift_type is changed in callback. so 'shift_type = "Check-In"' becomes 'shift_type = "Whatever"'
 # 5. modify the name of the SelectView class so 'class CheckInSelectView(discord.ui.View):' becomes 'class WhateverSelectView(discord.ui.View):'
@@ -244,7 +246,7 @@ class CheckInSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -374,7 +376,7 @@ class UltimateSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -504,7 +506,7 @@ class MeleeSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -520,7 +522,6 @@ class MeleeSelect(discord.ui.Select):
         # Go bottom-up, left-right to find shifts
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
-
                 logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
@@ -634,7 +635,7 @@ class RivalsSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -764,7 +765,7 @@ class StreetFighterSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -894,7 +895,7 @@ class TekkenSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -1024,7 +1025,7 @@ class GuiltyGearSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -1154,7 +1155,7 @@ class DegenesisSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -1284,7 +1285,7 @@ class DataEntrySelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -1414,7 +1415,7 @@ class BracketsOnDemandSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -1544,7 +1545,7 @@ class InfoDeskSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -1674,7 +1675,7 @@ class FloaterSelect(discord.ui.Select):
         thursday_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
             sheet="Sign Up",
-            value="Thursday 2/13",
+            value=THURSDAY_COL_HEADER,
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
@@ -1974,7 +1975,7 @@ class VolunteerCommands(commands.Cog):
             day_cell = get_cell_indexes(
                 spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
                 sheet="Sign Up",
-                value="Thursday 2/13",
+                value=THURSDAY_COL_HEADER,
             )
 
             day_column = day_cell["column_index"]

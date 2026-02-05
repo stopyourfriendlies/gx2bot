@@ -50,6 +50,7 @@ class ScheduledMessages(commands.Cog):
 
     @tasks.loop(seconds=30.0)
     async def printer(self):
+        print("CHECKING MESSAGES")
         messages = scheduled_messages_sheet.worksheet("Scheduler").get_all_values()
         # print(messages)
         # messages[1][2] = "OVERWRITE"
@@ -121,7 +122,6 @@ class ScheduledMessages(commands.Cog):
 
             # print(current_date.strftime(msgDateTimeFormat))
             # message[status_index] = "Valid"
-
             if parsed_time.strftime(msgDateTimeFormat) == current_date.strftime(
                 msgDateTimeFormat
             ):

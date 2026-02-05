@@ -143,10 +143,10 @@ class TOCommands(commands.Cog):
     ## Commands
 
     # Type "!getMembersInRole [role_name]" to populate the specified Google Sheet with Members of that Role.
+    # If you have a role_name with multiple words, surround it with quotes (example: '!getMembersInRole "CORE STAFF"')
     @commands.command()
     async def getMembersInRole(self, ctx, role_name):
         output = []
-
         for role in ctx.guild.roles:
             if role.name == role_name:
                 # print(role.members)

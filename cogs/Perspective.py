@@ -181,4 +181,5 @@ class Perspective(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(Perspective(bot))
+    # await bot.add_cog(Perspective(bot))
+    pass
