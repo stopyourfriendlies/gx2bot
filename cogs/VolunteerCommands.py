@@ -2026,7 +2026,7 @@ class VolunteerCommands(commands.Cog):
         if message.content.lower() == "i would like to help with street fighter":
             # Send a DM to the user with the Shift Signup dropdown
             await message.author.send(
-                f"**STREET FIGHTER SHIFT SIGNUPS**\n\nThanks for offering to help with the **Street Fighter** team.\n\nThe Street Fighter team lead is **<@176612585120989184>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
+                f"**STREET FIGHTER SHIFT SIGNUPS**\n\nThanks for offering to help with the **Street Fighter** team.\n\nThe Street Fighter team leads are **<@140318095888744448>** and **<@185117066779557889>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
                 view=StreetFighterSelectView(),
             )
 
@@ -2036,7 +2036,7 @@ class VolunteerCommands(commands.Cog):
         if message.content.lower() == "i would like to help with tekken":
             # Send a DM to the user with the Shift Signup dropdown
             await message.author.send(
-                f"**TEKKEN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Tekken** team.\n\nThe Tekken team lead is **<@670850926432616468>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
+                f"**TEKKEN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Tekken** team.\n\nThe Tekken team leads are **<@140318095888744448>** and **<@185117066779557889>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
                 view=TekkenSelectView(),
             )
 
@@ -2046,7 +2046,7 @@ class VolunteerCommands(commands.Cog):
         if message.content.lower() == "i would like to help with guilty gear":
             # Send a DM to the user with the Shift Signup dropdown
             await message.author.send(
-                f"**GUILTY GEAR SHIFT SIGNUPS**\n\nThanks for offering to help with the **Guilty Gear** team.\n\nThe Guilty Gear team lead is **<@140318095888744448>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
+                f"**GUILTY GEAR SHIFT SIGNUPS**\n\nThanks for offering to help with the **Guilty Gear** team.\n\nThe Guilty Gear team leads are **<@140318095888744448>** and **<@185117066779557889>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
                 view=GuiltyGearSelectView(),
             )
 
@@ -2056,7 +2056,7 @@ class VolunteerCommands(commands.Cog):
         if message.content.lower() == "i would like to help with 2xko":
             # Send a DM to the user with the Shift Signup dropdown
             await message.author.send(
-                f"**2XKO SIGNUPS**\n\nThanks for offering to help with the **2XKO** team.\n\nThe 2XKO team lead is **<@140318095888744448>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
+                f"**2XKO SIGNUPS**\n\nThanks for offering to help with the **2XKO** team.\n\nThe 2XKO team leads are **<@140318095888744448>** and **<@185117066779557889>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
                 view=TwoXKOSelectView(),
             )
 
