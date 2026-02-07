@@ -38,7 +38,7 @@ import queue
 
 from utils.spreadsheet import *
 
-THURSDAY_COL_HEADER = "Thursday 2/12"
+THURSDAY_COL_HEADER = "Thursday 2/12"  # needs the weird empty space char apparently
 
 ## Logging
 
@@ -174,12 +174,16 @@ class ShiftRequest:
         )
 
         # gx_shift_signups_sheet.update_cell(requester_row + 1, time_column + 1, self.shift_type)
+        # TODO: Remove hardcoded case
+        display_shift_type = self.shift_type
+        if display_shift_type != "2XKO":
+            display_shift_type = display_shift_type.title()
         set_value(
             os.getenv("SHEET_SHIFT_SIGNUPS"),
             "Sign Up",
             requester_row + 1,
             time_column + 1,
-            self.shift_type.title(),
+            display_shift_type,
         )
 
         # gx_shift_signups_values[requester_row][time_column] = self.shift_type
@@ -1142,6 +1146,134 @@ class GuiltyGearSelectView(discord.ui.View):
         self.add_item(GuiltyGearSelect())
 
 
+class TwoXKOSelect(discord.ui.Select):
+    def __init__(self):
+        # Clear cache and then pull the latest values from the sheet
+        get_values.cache_clear()
+        latest_data = get_values(os.getenv("SHEET_SHIFT_SIGNUPS"), "Sign Up")
+
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "2XKO"
+
+        # Get the row and column of the Days of Week by finding where Thursday is
+        thursday_cell = get_cell_indexes(
+            spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
+            sheet="Sign Up",
+            value=THURSDAY_COL_HEADER,
+        )
+        thursday_column = thursday_cell["column_index"]
+        thursday_row = thursday_cell["row_index"]
+
+        logger.info(
+            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
+        )
+
+        # Initialize some vars
+        shift_day = "Thursday"
+        options = []
+
+        # Go bottom-up, left-right to find shifts
+        for column_index in range(thursday_column, len(latest_data[0]), 1):
+            for row_index in range(thursday_row, -1, -1):
+
+                logger.debug(str(latest_data[row_index][column_index]))
+
+                # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
+                if (row_index == thursday_row) and str(
+                    latest_data[row_index][column_index]
+                ) != "":
+                    shift_day = str(latest_data[row_index][column_index])
+                    continue
+
+                # Sanity Check: skip if not the right shift type. This will just check the first word of the shift_type. So "street" will match up with "street fighter"
+                if (
+                    f"{shift_type.split(' ')[0].strip().lower()}"
+                    not in str(latest_data[row_index][column_index]).lower()
+                ):
+                    continue
+
+                # Sanity Check: skip if their are 0 shifts left
+                if "​0​/" in str(latest_data[row_index][column_index]):
+                    continue
+
+                # Sanity Check: skip if there are more options then the max of 25 allowed within a Select Menu dropdown. This is a limitation that Discord imposes.
+                if len(options) >= 25:
+                    break
+
+                # If sanity checks pass, set the variables needed to add a select menu option
+                shift_time = latest_data[int(thursday_row) + 1][column_index]
+
+                # Add shift into the Select Menu dropdown
+                logger.info(
+                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                )
+                options.append(
+                    discord.SelectOption(
+                        label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
+                        emoji="📋",
+                        description="",
+                    )
+                )
+
+        # Set the Select Menu options
+        if len(options) < 1:
+            options.append(
+                discord.SelectOption(
+                    label=f"Sorry",
+                    emoji="❌",
+                    description=f"There are no {shift_type} shifts available right now.",
+                )
+            )
+
+        # Set up the select menu
+        super().__init__(
+            placeholder=f"{shift_type} Shifts (Select Multiple)",
+            max_values=len(options),
+            min_values=0,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        # if no shifts, make no response
+        if "sorry" in str(self.values[0]).lower():
+            await interaction.response.defer()
+
+        # define shift_type early so that you can just change it here instead of changing out all the strings below.
+        shift_type = "2XKO"
+
+        # Send the user a message that you are processing their requests
+        await interaction.response.send_message(
+            content=f"Your {shift_type} shift request(s) have been added to the queue. You will receive a response whether or not your shift was successfully added once your request is processed. Please be patient!",
+            ephemeral=True,
+        )
+
+        # Go through each request if the user selected multiple options in the dropdown
+        for response in self.values:
+            # Form the shift request
+            timestamp = datetime.now()
+            requester = interaction.user.display_name
+            shift_type = response.split(",")[2].strip()
+            shift_day = response.split(",")[0].strip()
+            shift_time = response.split(",")[1].strip()
+            request = ShiftRequest(
+                timestamp, requester, shift_type, shift_day, shift_time, interaction
+            )
+
+            logging.info(
+                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
+            )
+
+            # Add the shift request to the queue
+            requests_queue.put(request)
+            logging.info("Queue size: " + str(requests_queue.qsize()))
+
+
+class TwoXKOSelectView(discord.ui.View):
+    def __init__(self, *, timeout=600):
+        super().__init__(timeout=timeout)
+        self.add_item(TwoXKOSelect())
+
+
 class DegenesisSelect(discord.ui.Select):
     def __init__(self):
         # Clear cache and then pull the latest values from the sheet
@@ -1847,10 +1979,14 @@ class VolunteerCommands(commands.Cog):
         msgDateTime = datetime.strftime(now, msgDateTimeFormat)
 
         # Respond to request to help with Check-In
-        if message.content.lower() == "i would like to help with checkin":
+        checkin_messages = [
+            "i would like to help with checkin",
+            "i would like to help with check-in",
+        ]
+        if message.content.lower() in checkin_messages:
             # Send a DM to the user with the Shift Signup dropdown
             await message.author.send(
-                f"**CHECK-IN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Check-In** team.\n\nThe Check-In team leads are **<@237313363556696065>** and **<@280949423612100608>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
+                f"**CHECK-IN SHIFT SIGNUPS**\n\nThanks for offering to help with the **Check-In** team.\n\nThe Check-In team leads are **<@237313363556696065>** and **<@618996785452417064>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
                 view=CheckInSelectView(),
             )
 
@@ -1870,7 +2006,7 @@ class VolunteerCommands(commands.Cog):
         if message.content.lower() == "i would like to help with melee":
             # Send a DM to the user with the Shift Signup dropdown
             await message.author.send(
-                f"**MELEE SHIFT SIGNUPS**\n\nThanks for offering to help with the **Melee** team.\n\nThe Melee team leads are **<@327166415713075212>** and **<@522869098707681306>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
+                f"**MELEE SHIFT SIGNUPS**\n\nThanks for offering to help with the **Melee** team.\n\nThe Melee team leads are **<@327166415713075212>**, **<@150905096413118465>**, and **<@522869098707681306>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
                 view=MeleeSelectView(),
             )
 
@@ -1917,27 +2053,41 @@ class VolunteerCommands(commands.Cog):
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
 
-        if message.content.lower() == "i would like to help with degenesis":
+        if message.content.lower() == "i would like to help with 2xko":
             # Send a DM to the user with the Shift Signup dropdown
             await message.author.send(
-                f"**DEGENESIS SHIFT SIGNUPS**\n\nThanks for offering to help with the **Degenesis** team.\n\nThe Degenesis team lead is **<@175419147008606208>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
-                view=DegenesisSelectView(),
+                f"**2XKO SIGNUPS**\n\nThanks for offering to help with the **2XKO** team.\n\nThe 2XKO team lead is **<@140318095888744448>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
+                view=TwoXKOSelectView(),
             )
 
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
+        # if message.content.lower() == "i would like to help with degenesis":
+        #     # Send a DM to the user with the Shift Signup dropdown
+        #     await message.author.send(
+        #         f"**DEGENESIS SHIFT SIGNUPS**\n\nThanks for offering to help with the **Degenesis** team.\n\nThe Degenesis team lead is **<@175419147008606208>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
+        #         view=DegenesisSelectView(),
+        #     )
 
-        if message.content.lower() == "i would like to help with data entry":
-            # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(
-                f"**DATA ENTRY SHIFT SIGNUPS**\n\nThanks for offering to help with the **Data Entry** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
-                view=DataEntrySelectView(),
-            )
+        #     # Acknowledge the user's message with an emote react.
+        #     await message.add_reaction("✅")
 
-            # Acknowledge the user's message with an emote react.
-            await message.add_reaction("✅")
+        # if message.content.lower() == "i would like to help with data entry":
+        #     # Send a DM to the user with the Shift Signup dropdown
+        #     await message.author.send(
+        #         f"**DATA ENTRY SHIFT SIGNUPS**\n\nThanks for offering to help with the **Data Entry** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
+        #         view=DataEntrySelectView(),
+        #     )
 
-        if message.content.lower() == "i would like to help with brackets on demand":
+        #     # Acknowledge the user's message with an emote react.
+        #     await message.add_reaction("✅")
+
+        brackets_on_demand_msgs = [
+            "i would like to help with brackets on demand",
+            "i would like to help with side events",
+            "i would like to help with ladder",
+        ]
+        if message.content.lower() in brackets_on_demand_msgs:
             # Send a DM to the user with the Shift Signup dropdown
             await message.author.send(
                 f"**BRACKETS ON DEMAND SHIFT SIGNUPS**\n\nThanks for offering to help with the **Brackets On Demand** team.\n\nThe Brackets On Demand team lead is  **<@167122411802591232>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
@@ -1947,17 +2097,20 @@ class VolunteerCommands(commands.Cog):
             # Acknowledge the user's message with an emote react.
             await message.add_reaction("✅")
 
-        if message.content.lower() == "i would like to help with info desk":
-            # Send a DM to the user with the Shift Signup dropdown
-            await message.author.send(
-                f"**INFO DESK SHIFT SIGNUPS**\n\nThanks for offering to help with the **INFO DESK** team.\n\nThe Info Desk team lead is  **<@406636968798191617>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
-                view=InfoDeskSelectView(),
-            )
+        # if message.content.lower() == "i would like to help with info desk":
+        #     # Send a DM to the user with the Shift Signup dropdown
+        #     await message.author.send(
+        #         f"**INFO DESK SHIFT SIGNUPS**\n\nThanks for offering to help with the **INFO DESK** team.\n\nThe Info Desk team lead is  **<@406636968798191617>**.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n​",
+        #         view=InfoDeskSelectView(),
+        #     )
 
-            # Acknowledge the user's message with an emote react.
-            await message.add_reaction("✅")
-
-        if message.content.lower() == "i would like to help with floater":
+        #     # Acknowledge the user's message with an emote react.
+        #     await message.add_reaction("✅")
+        floater_msgs = [
+            "i would like to help with floater",
+            "i would like to help by being a floater",
+        ]
+        if message.content.lower() in floater_msgs:
             # Send a DM to the user with the Shift Signup dropdown
             await message.author.send(
                 f"**FLOATER SHIFT SIGNUPS**\n\nThanks for offering to help with the **Floater** team.\n\nAs of *{msgDateTime} PST*, the following shifts in the dropdown are available. Please select when you would like to help out! Note that these are **1:30 hour shifts** that *start* at the listed time.\n\nThis drop-down will only work for the next 3 minutes. If you try to add a shift after then, you may get an Interaction Failed message. If that happens, please reprompt for a new dropdown.\n\n​",

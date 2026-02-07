@@ -184,7 +184,7 @@ def get_cell_indexes(
     return_dict["column_index"] = -1
 
     # logger.info(value)
-    # logger.info(sheet_values[13][3])
+    # logger.info(sheet_values[15][3])
 
     for row_index in range(len(sheet_values)):
         try:

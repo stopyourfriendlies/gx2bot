@@ -50,7 +50,7 @@ class ScheduledMessages(commands.Cog):
 
     @tasks.loop(seconds=30.0)
     async def printer(self):
-        print("CHECKING MESSAGES")
+        # print("CHECKING MESSAGES")
         messages = scheduled_messages_sheet.worksheet("Scheduler").get_all_values()
         # print(messages)
         # messages[1][2] = "OVERWRITE"
