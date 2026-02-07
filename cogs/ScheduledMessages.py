@@ -146,7 +146,6 @@ class ScheduledMessages(commands.Cog):
 
                     if messages[i][embed_thumbnail_index] != "":
                         embed_var.set_thumbnail(url=messages[i][embed_thumbnail_index])
-
                     await channel.send(messages[i][message_index], embed=embed_var)
                     messages[i][status_index] = "SENT"
                     scheduled_messages_sheet.worksheet("Scheduler").update(
@@ -321,17 +320,19 @@ class ScheduledMessages(commands.Cog):
 
                     await ctx.send(messages[i][message_index], embed=embed_var)
                     messages[i][status_index] = "TESTED"
-                    scheduled_messages_sheet.worksheet("Scheduler").update(
-                        "B1:B" + str(len(messages)),
-                        [sublist[1:2] for sublist in messages],
-                    )
+                    # scheduled_messages_sheet.worksheet("Scheduler").update(
+                    #     "B1:B" + str(len(messages)),
+                    #     [sublist[1:2] for sublist in messages],
+                    # )
+                    update_scheduler_worksheet(scheduled_messages_sheet, messages)
                     continue
 
                 await ctx.send(messages[i][message_index])
                 messages[i][status_index] = "TESTED"
-                scheduled_messages_sheet.worksheet("Scheduler").update(
-                    "B1:B" + str(len(messages)), [sublist[1:2] for sublist in messages]
-                )
+                # scheduled_messages_sheet.worksheet("Scheduler").update(
+                #     "B1:B" + str(len(messages)), [sublist[1:2] for sublist in messages]
+                # )
+                update_scheduler_worksheet(scheduled_messages_sheet, messages)
                 continue
 
             # except:
@@ -342,6 +343,12 @@ class ScheduledMessages(commands.Cog):
 
 # def setup(bot):
 #     bot.add_cog(ScheduledMessages(bot))
+
+
+def update_scheduler_worksheet(sheet, messages):
+    sheet.worksheet("Scheduler").update(
+        [sublist[1:2] for sublist in messages], "B1:B" + str(len(messages))
+    )
 
 
 async def setup(bot):
