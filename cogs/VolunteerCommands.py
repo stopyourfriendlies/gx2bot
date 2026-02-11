@@ -42,20 +42,13 @@ THURSDAY_COL_HEADER = "Thursday 2/12"  # needs the weird empty space char appar
 
 ## Logging
 
-logger = logging.getLogger("Volunteer")  # set up a log called 'TO'
-logger.setLevel(
-    logging.DEBUG
-)  # set Logging Level (DEBUG, INFO, WARNING, ERROR, CRITICAL) to only show info level and up
-
-# output log to file
-handler = logging.FileHandler(
-    filename="VolunteerCommands.log", encoding="utf-8", mode="w"
+from utils.logging_wrappers import (
+    log_available_shifts,
+    log_queue_request,
+    log_queue_size,
+    logger,
+    log_shift_init_fired,
 )
-handler.setFormatter(
-    logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
-)  # change this if you want log items formatted differently
-logger.addHandler(handler)
-
 
 ## Google Sheets setup
 
@@ -72,10 +65,10 @@ requests_queue = queue.Queue()
 
 def queue_request(self, request):
     requests_queue.put(request)
-    logging.info(
+    logger.info(
         f"Request added to Queue: {request.requester} is requesting {request.shift_type} at {request.shift_day} {request.shift_time}"
     )
-    logging.info(f"Queue size is now {str(requests_queue.qsize())}")
+    logger.info(f"Queue size is now {str(requests_queue.qsize())}")
     # await self.bot.process_commands(message)
 
 
@@ -94,9 +87,9 @@ class ShiftRequest:
     def is_available(self):
         # try:
 
-        logger.info(
-            f"is_available fired with self.shift_day={str(self.shift_day)}, self.shift_time={str(self.shift_time)}, and self.shift_type={str(self.shift_type)}"
-        )
+        # logger.info(
+        #     f"is_available fired with self.shift_day={str(self.shift_day)}, self.shift_time={str(self.shift_time)}, and self.shift_type={str(self.shift_type)}"
+        # )
 
         day_cell = get_cell_indexes(
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"),
@@ -107,7 +100,7 @@ class ShiftRequest:
         day_column = day_cell["column_index"]
         day_row = day_cell["row_index"]
 
-        logger.info(f"day_column={str(day_column)}, day_row={str(day_row)}")
+        # logger.info(f"day_column={str(day_column)}, day_row={str(day_row)}")
 
         time_column = get_time_column(
             os.getenv("SHEET_SHIFT_SIGNUPS"),
@@ -117,7 +110,7 @@ class ShiftRequest:
             self.shift_time,
         )
 
-        logger.info(f"time_column={str(time_column)}")
+        # logger.info(f"time_column={str(time_column)}")
 
         shift_type_row = get_shift_type_row(
             os.getenv("SHEET_SHIFT_SIGNUPS"), "Sign Up", self.shift_type
@@ -128,8 +121,8 @@ class ShiftRequest:
             spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"), sheet="Sign Up"
         )
 
-        logger.info(latest_values[shift_type_row][time_column])
-        logger.info(latest_values[shift_type_row][time_column].split("​")[1])
+        # logger.info(latest_values[shift_type_row][time_column])
+        # logger.info(latest_values[shift_type_row][time_column].split("​")[1])
 
         shifts_left = int(latest_values[shift_type_row][time_column].split("​")[1])
 
@@ -255,10 +248,10 @@ class CheckInSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '').replace('-', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
-
+        # logger.info(
+        #     f"{shift_type.replace(' ', '').replace('-', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
+        # )
+        log_shift_init_fired(shift_type)
         # Initialize some vars
         shift_day = "Thursday"
         options = []
@@ -267,7 +260,7 @@ class CheckInSelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -295,9 +288,9 @@ class CheckInSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -305,7 +298,7 @@ class CheckInSelect(discord.ui.Select):
                         description="",
                     )
                 )
-
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -352,13 +345,11 @@ class CheckInSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class CheckInSelectView(discord.ui.View):
@@ -385,9 +376,9 @@ class UltimateSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        # logger.info(
+        #     f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
+        # )
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -397,7 +388,7 @@ class UltimateSelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -425,9 +416,9 @@ class UltimateSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -435,7 +426,7 @@ class UltimateSelect(discord.ui.Select):
                         description="",
                     )
                 )
-
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -482,13 +473,11 @@ class UltimateSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class UltimateSelectView(discord.ui.View):
@@ -514,10 +503,7 @@ class MeleeSelect(discord.ui.Select):
         )
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
-
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -526,7 +512,7 @@ class MeleeSelect(discord.ui.Select):
         # Go bottom-up, left-right to find shifts
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -554,9 +540,9 @@ class MeleeSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -564,7 +550,7 @@ class MeleeSelect(discord.ui.Select):
                         description="",
                     )
                 )
-
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -611,13 +597,11 @@ class MeleeSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class MeleeSelectView(discord.ui.View):
@@ -644,9 +628,7 @@ class RivalsSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -656,7 +638,7 @@ class RivalsSelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -684,9 +666,9 @@ class RivalsSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -694,7 +676,7 @@ class RivalsSelect(discord.ui.Select):
                         description="",
                     )
                 )
-
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -741,13 +723,11 @@ class RivalsSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class RivalsSelectView(discord.ui.View):
@@ -774,9 +754,7 @@ class StreetFighterSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -786,7 +764,7 @@ class StreetFighterSelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -814,9 +792,9 @@ class StreetFighterSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -824,7 +802,7 @@ class StreetFighterSelect(discord.ui.Select):
                         description="",
                     )
                 )
-
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -871,13 +849,11 @@ class StreetFighterSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class StreetFighterSelectView(discord.ui.View):
@@ -904,9 +880,7 @@ class TekkenSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -916,7 +890,7 @@ class TekkenSelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -944,9 +918,9 @@ class TekkenSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -954,7 +928,7 @@ class TekkenSelect(discord.ui.Select):
                         description="",
                     )
                 )
-
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -1001,13 +975,11 @@ class TekkenSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class TekkenSelectView(discord.ui.View):
@@ -1034,9 +1006,7 @@ class GuiltyGearSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -1046,7 +1016,7 @@ class GuiltyGearSelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -1074,9 +1044,9 @@ class GuiltyGearSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -1084,7 +1054,7 @@ class GuiltyGearSelect(discord.ui.Select):
                         description="",
                     )
                 )
-
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -1131,13 +1101,11 @@ class GuiltyGearSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class GuiltyGearSelectView(discord.ui.View):
@@ -1164,9 +1132,7 @@ class TwoXKOSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -1176,7 +1142,7 @@ class TwoXKOSelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -1204,9 +1170,9 @@ class TwoXKOSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -1215,6 +1181,7 @@ class TwoXKOSelect(discord.ui.Select):
                     )
                 )
 
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -1259,13 +1226,11 @@ class TwoXKOSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class TwoXKOSelectView(discord.ui.View):
@@ -1292,9 +1257,7 @@ class DegenesisSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -1304,7 +1267,7 @@ class DegenesisSelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -1332,9 +1295,9 @@ class DegenesisSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -1343,6 +1306,7 @@ class DegenesisSelect(discord.ui.Select):
                     )
                 )
 
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -1389,13 +1353,11 @@ class DegenesisSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class DegenesisSelectView(discord.ui.View):
@@ -1422,9 +1384,7 @@ class DataEntrySelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -1434,7 +1394,7 @@ class DataEntrySelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -1462,9 +1422,7 @@ class DataEntrySelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                log_available_shifts(shift_type, options)
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -1519,13 +1477,11 @@ class DataEntrySelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class DataEntrySelectView(discord.ui.View):
@@ -1552,9 +1508,7 @@ class BracketsOnDemandSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -1564,7 +1518,7 @@ class BracketsOnDemandSelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -1592,9 +1546,9 @@ class BracketsOnDemandSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -1602,7 +1556,7 @@ class BracketsOnDemandSelect(discord.ui.Select):
                         description="",
                     )
                 )
-
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -1649,13 +1603,11 @@ class BracketsOnDemandSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class BracketsOnDemandSelectView(discord.ui.View):
@@ -1682,9 +1634,7 @@ class InfoDeskSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -1694,7 +1644,7 @@ class InfoDeskSelect(discord.ui.Select):
         for column_index in range(thursday_column, len(latest_data[0]), 1):
             for row_index in range(thursday_row, -1, -1):
 
-                logger.debug(str(latest_data[row_index][column_index]))
+                # logger.debug(str(latest_data[row_index][column_index]))
 
                 # Set day of week for shift if cell is not blank. So if it sees Friday, it will replace the shift_day, which starts as Thursday, with Friday.
                 if (row_index == thursday_row) and str(
@@ -1722,9 +1672,9 @@ class InfoDeskSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -1732,7 +1682,7 @@ class InfoDeskSelect(discord.ui.Select):
                         description="",
                     )
                 )
-
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -1779,13 +1729,11 @@ class InfoDeskSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class InfoDeskSelectView(discord.ui.View):
@@ -1812,9 +1760,7 @@ class FloaterSelect(discord.ui.Select):
         thursday_column = thursday_cell["column_index"]
         thursday_row = thursday_cell["row_index"]
 
-        logger.info(
-            f"{shift_type.replace(' ', '')}Select __init__ fired. thursday_cell={pprint(thursday_cell)}, thursday_column={thursday_column}. and thursday_row={thursday_row}"
-        )
+        log_shift_init_fired(shift_type)
 
         # Initialize some vars
         shift_day = "Thursday"
@@ -1852,9 +1798,9 @@ class FloaterSelect(discord.ui.Select):
                 shift_time = latest_data[int(thursday_row) + 1][column_index]
 
                 # Add shift into the Select Menu dropdown
-                logger.info(
-                    f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
-                )
+                # logger.info(
+                #     f"adding {shift_day.title()}, {shift_time}, {shift_type.upper()} to the {shift_type} Select Menu"
+                # )
                 options.append(
                     discord.SelectOption(
                         label=f"{shift_day.title()}, {shift_time}, {shift_type.upper()}",
@@ -1862,7 +1808,7 @@ class FloaterSelect(discord.ui.Select):
                         description="",
                     )
                 )
-
+        log_available_shifts(shift_type, options)
         # Set the Select Menu options
         if len(options) < 1:
             options.append(
@@ -1909,13 +1855,11 @@ class FloaterSelect(discord.ui.Select):
                 timestamp, requester, shift_type, shift_day, shift_time, interaction
             )
 
-            logging.info(
-                f"Queue request: {requester} is requesting {shift_type.upper()} at {shift_day.title()} {shift_time}"
-            )
+            log_queue_request(requester, shift_type, shift_day, shift_time)
 
             # Add the shift request to the queue
             requests_queue.put(request)
-            logging.info("Queue size: " + str(requests_queue.qsize()))
+            log_queue_size(requests_queue)
 
 
 class FloaterSelectView(discord.ui.View):
