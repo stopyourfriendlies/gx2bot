@@ -1,74 +1,35 @@
-# import discord.py libraries to interact with Discord
-import discord
-from discord.ext import commands, tasks
-from discord.utils import get  # just so we don't have to type discord.utils.get a lot
-from discord import app_commands  # to enable slash commands
-
-# import gspread libraries to interact with Google Sheets
 import gspread
 
-# import stuff to download images so we can post them to Discord
-import aiohttp
-import io
-
-# import time stuff
-from datetime import datetime
-import pytz
-
-# import helper stuff
-import logging  # to log obviously
-import os  # to get local files like credentials and such
-import re  # regular expressions to parse certain strings
-from pprint import pprint  # to pretty print lists and dictionaries
-from functools import (
-    lru_cache,
-)  # Least Recently Used Cache so we don't have to pound the APIs
-
-# from emoji import UNICODE_EMOJI
-
-
-## Logging
-
-logger = logging.getLogger("Spreadsheet Utils")  # set up a log called 'TO'
-logger.setLevel(
-    logging.DEBUG
-)  # set Logging Level (DEBUG, INFO, WARNING, ERROR, CRITICAL) to only show info level and up
-
-# output log to file
-handler = logging.FileHandler(
-    filename="SpreadsheetUtils.log", encoding="utf-8", mode="w"
+import logging
+import os
+from pprint import pprint
+from functools import lru_cache
+from utils.logging_setup import new_logger
+from config import (
+    CREDENTIALS_FILENAME,
+    SHEET_SHIFT_SIGNUPS,
+    SHEET_SHIFT_SIGNUPS_SIGNUPS_TAB,
 )
-handler.setFormatter(
-    logging.Formatter("%(asctime)s:%(levelname)s:%(name)s: %(message)s")
-)  # change this if you want log items formatted differently
-logger.addHandler(handler)
 
+logger = new_logger("SpreadsheetUtils", logging.DEBUG)
 
 ## Google Sheets setup
-
-# set credentials to use on the google sheet
-gc = gspread.service_account(filename="credentials.json")
+gc = gspread.service_account(filename=CREDENTIALS_FILENAME)
 
 
 @lru_cache
-def get_values(spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"), sheet="Sign Up"):
+def get_values(spreadsheet=SHEET_SHIFT_SIGNUPS, sheet=SHEET_SHIFT_SIGNUPS_SIGNUPS_TAB):
     logger.info(f"get_values fired with spreadsheet={spreadsheet} and sheet={sheet}")
-
     logger.info(f"opening spreadsheet {spreadsheet}")
     try:
-        openned_spreadsheet = gc.open(spreadsheet)
+        opened_spreadsheet = gc.open(spreadsheet)
     except:
         logger.error(f"get_values failed to open {spreadsheet}")
         return []
 
     logger.info(f"opening sheet {sheet} in spreadsheet {spreadsheet}")
     try:
-        if str(sheet).isdigit():
-            logger.info(f"sheet var is digit, so will open as an index")
-            openned_sheet = openned_spreadsheet.get_worksheet(int(sheet))
-        else:
-            logger.info(f"sheet var is not a digit, so will open by name")
-            openned_sheet = openned_spreadsheet.worksheet(str(sheet))
+        opened_sheet = open_sheet_from_spreadsheet(sheet, opened_spreadsheet)
     except:
         logger.error(
             f"get_values failed to open sheet {sheet} in spreadsheet {spreadsheet}"
@@ -77,7 +38,7 @@ def get_values(spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"), sheet="Sign Up"):
 
     logger.info(f"getting values of sheet {sheet} in spreadsheet {spreadsheet}")
     try:
-        openned_values = openned_sheet.get_values()
+        opened_values = opened_sheet.get_values()
     except:
         logger.error(
             f"get_values failed to get values of sheet {sheet} in spreadsheet {spreadsheet}"
@@ -85,7 +46,7 @@ def get_values(spreadsheet=os.getenv("SHEET_SHIFT_SIGNUPS"), sheet="Sign Up"):
         return []
 
     logger.info(f"get_values finished")
-    return openned_values
+    return opened_values
 
 
 def set_values(spreadsheet=os.getenv("SHEET_PUZZLES"), sheet=0, values=[]):
@@ -271,3 +232,13 @@ def get_requester_row(
     set_value(spreadsheet, sheet, row_index + 1, 3, str(requester))
 
     return row_index
+
+
+# TODO: gpsread.Spreadsheet?
+def open_sheet_from_spreadsheet(sheet: str, spreadsheet):
+    if str(sheet).isdigit():
+        logger.info(f"sheet var is digit, so will open as an index")
+        return spreadsheet.get_worksheet(int(sheet))
+
+    logger.info(f"sheet var is not a digit, so will open by name")
+    return spreadsheet.worksheet(str(sheet))
