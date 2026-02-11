@@ -22,15 +22,6 @@ class ShiftValidationCommands(commands.Cog):
         print("Shift Validation Commands ready")
         logger.info("ShiftValidationCommands Cog loaded.")
 
-    ## Commands
-
-    # Type "!ping" to check if bot is online.
-    @commands.command()
-    async def ping(self, ctx):
-        await ctx.message.author.send("pong")
-        await ctx.message.delete()
-        return
-
     @commands.Cog.listener("on_message")
     async def notify_rewards_from_webhook(self, msg):
         # TODO: Change hardcoded webhook id
